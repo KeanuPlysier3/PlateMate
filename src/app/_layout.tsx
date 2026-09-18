@@ -1,18 +1,33 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Link, Stack } from "expo-router";
+import { SymbolView } from "expo-symbols";
+import { Pressable } from "react-native";
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
-
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <Stack>
+      <Stack.Screen
+        name="(tabs)"
+        options={{
+          title: "PlateMate",
+          headerRight: () => (
+            <Link href="/profile" asChild>
+              <Pressable hitSlop={8}>
+                <SymbolView
+                  name={{ ios: "person.circle", android: "person", web: "person" }}
+                  size={22}
+                />
+              </Pressable>
+            </Link>
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="profile"
+        options={{
+          title: "Profiel",
+          presentation: "modal",
+        }}
+      />
+    </Stack>
   );
 }
