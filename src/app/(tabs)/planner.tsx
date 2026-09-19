@@ -1,7 +1,17 @@
 import { useState } from "react";
 import { Text, View, StyleSheet, Pressable } from "react-native";
+import { Link } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Calendar, type DateData } from "react-native-calendars";
+import { Dropdown } from "react-native-element-dropdown";
+
+import mealsData from "@/data/meals.json";
+import type { Meal } from "@/types/meal";
+
+// Typing this assignment as Meal[] makes TypeScript check every entry in
+// meals.json against the Meal shape (name/allergens/ingredients/description/link/image)
+// at compile time — a structurally invalid meal fails the build, not runtime.
+const meals: Meal[] = mealsData.meals;
 
 const ACCENT_COLOR = "#007AFF";
 
@@ -21,6 +31,7 @@ const getStartOfToday = () => {
 export default function Planner() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [pendingDate, setPendingDate] = useState<Date>(getStartOfToday);//initialize pendingDate to the start of today
+  const [selectedMealName, setSelectedMealName] = useState<string>(meals[0].name);
 
   const handleDayPress = (day: DateData) => {
     setPendingDate(new Date(day.year, day.month - 1, day.day)); //js indexes months from 0, so we need to subtract 1 from the month value
@@ -55,6 +66,32 @@ export default function Planner() {
               year: "numeric",
             })}
           </Text>
+          
+          <Dropdown
+            style={styles.dropdown}
+            containerStyle={styles.dropdownContainer}
+            placeholderStyle={styles.dropdownText}
+            selectedTextStyle={styles.dropdownText}
+            itemTextStyle={styles.dropdownText}
+            data={meals}
+            labelField="name"
+            valueField="name"
+            placeholder="Meals"
+            
+            onChange={(meal) => setSelectedMealName(meal.name)}
+          />
+
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>-of-</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <Link href="/add-meal" asChild>
+            <Pressable style={styles.addMealButton}>
+              <Text style={styles.addMealButtonText}>+ Nieuw Recept</Text>
+            </Pressable>
+          </Link>
         </>
       ) : (
         <>
@@ -113,11 +150,52 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "700",
   },
+  dropdown: {
+    width: "100%",
+    height: 50,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  dropdownContainer: {
+    borderRadius: 8,
+  },
+  dropdownText: {
+    fontSize: 16,
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#ccc",
+  },
+  dividerText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#888",
+  },
+  addMealButton: {
+    width: "100%",
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#1c1c1e",
+    alignItems: "center",
+  },
+  addMealButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
   confirmButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    color: {ACCENT_COLOR},
     backgroundColor: "#1c1c1e",
   },
   confirmButtonText: {

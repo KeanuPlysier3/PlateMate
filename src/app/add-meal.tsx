@@ -1,0 +1,181 @@
+import { useState } from "react";
+import { ScrollView, Text, TextInput, StyleSheet, Pressable, Alert } from "react-native";
+import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import MealImageField from "@/components/meal-image-field";
+import type { Meal } from "@/types/meal";
+
+// Every Meal field is required to fill in the form EXCEPT allergens and image
+// (allergens can be empty, image falls back to a placeholder) — deriving this
+// list from `keyof Meal` means a future change to the Meal shape that isn't
+// reflected here fails the type check below, instead of silently going stale.
+type RequiredMealField = Exclude<keyof Meal, "allergens" | "image">;
+
+// Bundled fallback used when the user doesn't pick a photo. Stored the same
+// way the 45 seeded meals store their images: a path relative to `@/assets/`.
+const PLACEHOLDER_IMAGE = "images/meal-placeholder.png";
+
+// All user-added meals live under this one AsyncStorage key, as a single
+// JSON-serialized Meal[] — merging this with the bundled meals.json into one
+// combined list (e.g. for the dropdown) is a later step, not part of this one.
+const CUSTOM_MEALS_STORAGE_KEY = "customMeals";
+
+const splitCommaList = (value: string): string[] =>
+  value
+    .split(",")
+    .map((item) => item.trim())//no whitespace
+    .filter((item) => item !== "");//remove empty strings
+
+export default function AddMeal() {
+  const [name, setName] = useState("");
+  const [allergens, setAllergens] = useState("");
+  const [ingredients, setIngredients] = useState("");
+  const [description, setDescription] = useState("");
+  const [link, setLink] = useState("");
+  const [imagePath, setImagePath] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const requiredFieldValues: Record<RequiredMealField, string> = {// TypeScript type check ensures all required fields are present
+    name,
+    ingredients,
+    description,
+    link,
+  };
+
+  const isFormValid = Object.values(requiredFieldValues).every(//check that all required fields are non-empty after trimming whitespace
+    (value) => value.trim() !== "",
+  );
+
+  const handleSubmit = async () => {
+    if (!isFormValid || isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const newMeal: Meal = {
+        name: name.trim(),
+        allergens: splitCommaList(allergens),
+        ingredients: splitCommaList(ingredients),
+        description: description.trim(),
+        link: link.trim(),
+        image: imagePath ?? PLACEHOLDER_IMAGE,
+      };
+
+      const storedValue = await AsyncStorage.getItem(CUSTOM_MEALS_STORAGE_KEY);
+      const customMeals: Meal[] = storedValue ? JSON.parse(storedValue) : [];
+      customMeals.push(newMeal);
+      await AsyncStorage.setItem(
+        CUSTOM_MEALS_STORAGE_KEY,
+        JSON.stringify(customMeals),
+      );
+
+      router.back();
+    } catch (error) {
+      Alert.alert(
+        "Opslaan mislukt",
+        "Het is niet gelukt om de maaltijd op te slaan. Probeer het opnieuw.",
+      );
+    } finally { //even if the save fails, we want to reset the saving state so the user can try again
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.label}>Naam</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Bijv. Spaghetti Carbonara"
+        value={name}
+        onChangeText={setName}
+      />
+
+      <Text style={styles.label}>Allergenen</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Komma-gescheiden, bijv. gluten, dairy, egg"
+        value={allergens}
+        onChangeText={setAllergens}
+      />
+
+      <Text style={styles.label}>Ingrediënten</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Komma-gescheiden, bijv. pasta, eieren, kaas"
+        value={ingredients}
+        onChangeText={setIngredients}
+      />
+
+      <Text style={styles.label}>Beschrijving</Text>
+      <TextInput
+        style={[styles.input, styles.multilineInput]}
+        placeholder="Korte omschrijving van het gerecht"
+        multiline
+        value={description}
+        onChangeText={setDescription}
+      />
+
+      <Text style={styles.label}>Link</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="https://..."
+        value={link}
+        onChangeText={setLink}
+      />
+
+      <Text style={styles.label}>Afbeelding</Text>
+      <MealImageField onImagePathChange={setImagePath} />
+
+      <Pressable
+        style={[styles.submitButton, !isFormValid && styles.submitButtonDisabled]}
+        disabled={!isFormValid || isSaving}
+        onPress={handleSubmit}
+      >
+        <Text style={styles.submitButtonText}>
+          {isSaving ? "Bezig met opslaan..." : "Toevoegen"}
+        </Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 24,
+    gap: 8,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 12,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+  },
+  multilineInput: {
+    height: 80,
+    textAlignVertical: "top",
+  },
+  submitButton: {
+    marginTop: 24,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: "#1c1c1e",
+    alignItems: "center",
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#aaa",
+  },
+  submitButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});

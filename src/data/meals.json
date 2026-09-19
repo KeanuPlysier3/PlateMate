@@ -1,0 +1,364 @@
+{
+  "meals": [
+    {
+      "name": "Classic Spaghetti Carbonara",
+      "allergens": ["dairy", "egg", "gluten"],
+      "ingredients": ["spaghetti", "eggs", "pecorino romano cheese", "guanciale", "black pepper", "salt"],
+      "description": "A creamy Roman pasta dish made without cream, relying on eggs and cheese to form a silky sauce coating salty cured pork.",
+      "link": "https://www.allrecipes.com/search?q=spaghetti+carbonara",
+      "image": "images/meals/classic-spaghetti-carbonara.jpg"
+    },
+    {
+      "name": "Chicken Tikka Masala",
+      "allergens": ["dairy"],
+      "ingredients": ["chicken breast", "yogurt", "garam masala", "tomato puree", "heavy cream", "garlic", "ginger", "onion"],
+      "description": "Tender marinated chicken pieces simmered in a rich, spiced tomato and cream sauce, a beloved Indian-British classic.",
+      "link": "https://www.allrecipes.com/search?q=chicken+tikka+masala",
+      "image": "images/meals/chicken-tikka-masala.jpg"
+    },
+    {
+      "name": "Beef Tacos",
+      "allergens": ["gluten", "dairy"],
+      "ingredients": ["ground beef", "taco shells", "cheddar cheese", "lettuce", "tomato", "taco seasoning", "sour cream"],
+      "description": "Crispy shells filled with seasoned ground beef and fresh toppings, a quick and satisfying weeknight favorite.",
+      "link": "https://www.allrecipes.com/search?q=beef+tacos",
+      "image": "images/meals/beef-tacos.jpg"
+    },
+    {
+      "name": "Vegetable Pad Thai",
+      "allergens": ["peanuts", "soy", "egg", "shellfish"],
+      "ingredients": ["rice noodles", "tofu", "eggs", "bean sprouts", "peanuts", "tamarind paste", "fish sauce", "scallions"],
+      "description": "Stir-fried rice noodles tossed in a tangy-sweet tamarind sauce with crunchy peanuts and fresh vegetables.",
+      "link": "https://www.allrecipes.com/search?q=vegetable+pad+thai",
+      "image": "images/meals/vegetable-pad-thai.jpg"
+    },
+    {
+      "name": "Margherita Pizza",
+      "allergens": ["gluten", "dairy"],
+      "ingredients": ["pizza dough", "mozzarella cheese", "tomatoes", "fresh basil", "olive oil", "salt"],
+      "description": "A simple Neapolitan classic featuring fresh mozzarella, ripe tomatoes, and basil atop a chewy, blistered crust.",
+      "link": "https://www.allrecipes.com/search?q=margherita+pizza",
+      "image": "images/meals/margherita-pizza.jpg"
+    },
+    {
+      "name": "Miso Glazed Salmon",
+      "allergens": ["fish", "soy"],
+      "ingredients": ["salmon fillets", "white miso paste", "soy sauce", "mirin", "brown sugar", "sesame oil", "scallions"],
+      "description": "Flaky salmon broiled with a sweet-savory miso glaze, delivering deep umami flavor in under 30 minutes.",
+      "link": "https://www.allrecipes.com/search?q=miso+glazed+salmon",
+      "image": "images/meals/miso-glazed-salmon.jpg"
+    },
+    {
+      "name": "Classic Beef Burger",
+      "allergens": ["gluten", "dairy", "egg"],
+      "ingredients": ["ground beef", "burger buns", "cheddar cheese", "lettuce", "tomato", "onion", "mayonnaise"],
+      "description": "A juicy grilled beef patty topped with melted cheese and fresh vegetables, served on a toasted bun.",
+      "link": "https://www.allrecipes.com/search?q=classic+beef+burger",
+      "image": "images/meals/classic-beef-burger.jpg"
+    },
+    {
+      "name": "Falafel Wrap",
+      "allergens": ["gluten", "sesame"],
+      "ingredients": ["chickpeas", "parsley", "garlic", "cumin", "tahini", "flatbread", "tomato", "cucumber"],
+      "description": "Crispy fried chickpea patties wrapped in soft flatbread with a creamy tahini sauce and fresh vegetables.",
+      "link": "https://www.allrecipes.com/search?q=falafel+wrap",
+      "image": "images/meals/falafel-wrap.jpg"
+    },
+    {
+      "name": "Shrimp Scampi",
+      "allergens": ["shellfish", "gluten", "dairy"],
+      "ingredients": ["shrimp", "linguine", "garlic", "butter", "white wine", "lemon juice", "parsley"],
+      "description": "Succulent shrimp sautéed in a garlicky butter and white wine sauce, tossed with linguine and fresh herbs.",
+      "link": "https://www.allrecipes.com/search?q=shrimp+scampi",
+      "image": "images/meals/shrimp-scampi.jpg"
+    },
+    {
+      "name": "Vegetable Stir Fry",
+      "allergens": ["soy"],
+      "ingredients": ["broccoli", "bell peppers", "carrots", "snap peas", "soy sauce", "garlic", "ginger", "sesame oil"],
+      "description": "A colorful medley of crisp vegetables quickly stir-fried in a savory garlic-ginger sauce.",
+      "link": "https://www.allrecipes.com/search?q=vegetable+stir+fry",
+      "image": "images/meals/vegetable-stir-fry.jpg"
+    },
+    {
+      "name": "Chicken Caesar Salad",
+      "allergens": ["dairy", "egg", "fish", "gluten"],
+      "ingredients": ["romaine lettuce", "grilled chicken breast", "parmesan cheese", "croutons", "caesar dressing", "anchovies"],
+      "description": "Crisp romaine tossed with grilled chicken, shaved parmesan, and a classic garlicky anchovy dressing.",
+      "link": "https://www.allrecipes.com/search?q=chicken+caesar+salad",
+      "image": "images/meals/chicken-caesar-salad.jpg"
+    },
+    {
+      "name": "Beef Bourguignon",
+      "allergens": ["dairy"],
+      "ingredients": ["beef chuck", "red wine", "carrots", "pearl onions", "mushrooms", "bacon", "beef stock", "thyme"],
+      "description": "A rich French stew of beef slow-braised in red wine with earthy mushrooms and tender vegetables.",
+      "link": "https://www.allrecipes.com/search?q=beef+bourguignon",
+      "image": "images/meals/beef-bourguignon.jpg"
+    },
+    {
+      "name": "Margherita Flatbread",
+      "allergens": ["gluten", "dairy"],
+      "ingredients": ["flatbread", "mozzarella", "cherry tomatoes", "basil", "balsamic glaze", "olive oil"],
+      "description": "A lighter take on pizza using thin flatbread topped with fresh mozzarella and juicy cherry tomatoes.",
+      "link": "https://www.allrecipes.com/search?q=margherita+flatbread",
+      "image": "images/meals/margherita-flatbread.jpg"
+    },
+    {
+      "name": "Butter Chicken",
+      "allergens": ["dairy"],
+      "ingredients": ["chicken thighs", "butter", "tomato puree", "heavy cream", "garam masala", "garlic", "ginger"],
+      "description": "Tender chicken simmered in a velvety, spiced tomato-butter sauce, an Indian restaurant favorite.",
+      "link": "https://www.allrecipes.com/search?q=butter+chicken",
+      "image": "images/meals/butter-chicken.jpg"
+    },
+    {
+      "name": "Grilled Cheese Sandwich",
+      "allergens": ["gluten", "dairy"],
+      "ingredients": ["bread", "cheddar cheese", "butter"],
+      "description": "A simple, comforting classic of buttery toasted bread with gooey melted cheddar inside.",
+      "link": "https://www.allrecipes.com/search?q=grilled+cheese+sandwich",
+      "image": "images/meals/grilled-cheese-sandwich.jpg"
+    },
+    {
+      "name": "Lentil Soup",
+      "allergens": [],
+      "ingredients": ["lentils", "carrots", "celery", "onion", "garlic", "vegetable broth", "cumin", "tomato paste"],
+      "description": "A hearty, nourishing soup packed with protein-rich lentils and aromatic vegetables, naturally vegan.",
+      "link": "https://www.allrecipes.com/search?q=lentil+soup",
+      "image": "images/meals/lentil-soup.jpg"
+    },
+    {
+      "name": "Pork Carnitas",
+      "allergens": [],
+      "ingredients": ["pork shoulder", "orange juice", "lime juice", "garlic", "cumin", "bay leaves", "onion"],
+      "description": "Slow-cooked pork shoulder that's shredded and crisped, bursting with citrus and spice flavor.",
+      "link": "https://www.allrecipes.com/search?q=pork+carnitas",
+      "image": "images/meals/pork-carnitas.jpg"
+    },
+    {
+      "name": "Eggplant Parmesan",
+      "allergens": ["gluten", "dairy", "egg"],
+      "ingredients": ["eggplant", "breadcrumbs", "eggs", "mozzarella cheese", "parmesan cheese", "marinara sauce", "basil"],
+      "description": "Breaded, fried eggplant slices layered with marinara and melted cheese, baked until bubbly.",
+      "link": "https://www.allrecipes.com/search?q=eggplant+parmesan",
+      "image": "images/meals/eggplant-parmesan.jpg"
+    },
+    {
+      "name": "Thai Green Curry",
+      "allergens": ["shellfish"],
+      "ingredients": ["chicken thighs", "green curry paste", "coconut milk", "bamboo shoots", "thai basil", "fish sauce", "eggplant"],
+      "description": "A fragrant, spicy coconut curry with tender chicken and vegetables, fresh with basil and lime.",
+      "link": "https://www.allrecipes.com/search?q=thai+green+curry",
+      "image": "images/meals/thai-green-curry.jpg"
+    },
+    {
+      "name": "Caprese Salad",
+      "allergens": ["dairy"],
+      "ingredients": ["fresh mozzarella", "tomatoes", "fresh basil", "olive oil", "balsamic vinegar", "salt"],
+      "description": "A refreshing Italian salad of layered tomatoes, mozzarella, and basil drizzled with olive oil.",
+      "link": "https://www.allrecipes.com/search?q=caprese+salad",
+      "image": "images/meals/caprese-salad.jpg"
+    },
+    {
+      "name": "Chili Con Carne",
+      "allergens": [],
+      "ingredients": ["ground beef", "kidney beans", "tomatoes", "chili powder", "onion", "garlic", "cumin"],
+      "description": "A warming, hearty stew of ground beef, beans, and spices simmered together for deep flavor.",
+      "link": "https://www.allrecipes.com/search?q=chili+con+carne",
+      "image": "images/meals/chili-con-carne.jpg"
+    },
+    {
+      "name": "Sushi Rolls (California Roll)",
+      "allergens": ["shellfish", "sesame"],
+      "ingredients": ["sushi rice", "nori", "imitation crab", "avocado", "cucumber", "sesame seeds", "rice vinegar"],
+      "description": "Classic rolled sushi with creamy avocado, crab, and cucumber, rolled in seasoned rice and nori.",
+      "link": "https://www.allrecipes.com/search?q=california+roll+sushi",
+      "image": "images/meals/sushi-rolls-california-roll.jpg"
+    },
+    {
+      "name": "Chicken Noodle Soup",
+      "allergens": ["gluten", "egg"],
+      "ingredients": ["chicken breast", "egg noodles", "carrots", "celery", "onion", "chicken broth", "parsley"],
+      "description": "A soothing classic soup of tender chicken, vegetables, and noodles in a savory broth.",
+      "link": "https://www.allrecipes.com/search?q=chicken+noodle+soup",
+      "image": "images/meals/chicken-noodle-soup.jpg"
+    },
+    {
+      "name": "Beef and Broccoli",
+      "allergens": ["soy", "gluten"],
+      "ingredients": ["flank steak", "broccoli", "soy sauce", "garlic", "ginger", "cornstarch", "sesame oil"],
+      "description": "Tender sliced beef and crisp broccoli tossed in a glossy savory-sweet soy sauce, a takeout favorite at home.",
+      "link": "https://www.allrecipes.com/search?q=beef+and+broccoli",
+      "image": "images/meals/beef-and-broccoli.jpg"
+    },
+    {
+      "name": "Greek Salad",
+      "allergens": ["dairy"],
+      "ingredients": ["cucumber", "tomatoes", "red onion", "kalamata olives", "feta cheese", "olive oil", "oregano"],
+      "description": "A refreshing, crunchy salad of crisp vegetables, briny olives, and tangy feta cheese.",
+      "link": "https://www.allrecipes.com/search?q=greek+salad",
+      "image": "images/meals/greek-salad.jpg"
+    },
+    {
+      "name": "Fish and Chips",
+      "allergens": ["fish", "gluten", "egg"],
+      "ingredients": ["cod fillets", "flour", "beer", "eggs", "potatoes", "vegetable oil", "malt vinegar"],
+      "description": "Crispy beer-battered fish served with golden, crunchy fries, a British pub classic.",
+      "link": "https://www.allrecipes.com/search?q=fish+and+chips",
+      "image": "images/meals/fish-and-chips.jpg"
+    },
+    {
+      "name": "Ratatouille",
+      "allergens": [],
+      "ingredients": ["eggplant", "zucchini", "bell peppers", "tomatoes", "onion", "garlic", "herbes de provence", "olive oil"],
+      "description": "A rustic French vegetable stew, slow-cooked until tender and fragrant with Provençal herbs.",
+      "link": "https://www.allrecipes.com/search?q=ratatouille",
+      "image": "images/meals/ratatouille.jpg"
+    },
+    {
+      "name": "Chicken Fajitas",
+      "allergens": ["gluten", "dairy"],
+      "ingredients": ["chicken breast", "bell peppers", "onion", "tortillas", "sour cream", "lime", "fajita seasoning"],
+      "description": "Sizzling strips of seasoned chicken and peppers wrapped in warm tortillas with fresh toppings.",
+      "link": "https://www.allrecipes.com/search?q=chicken+fajitas",
+      "image": "images/meals/chicken-fajitas.jpg"
+    },
+    {
+      "name": "Mushroom Risotto",
+      "allergens": ["dairy"],
+      "ingredients": ["arborio rice", "mushrooms", "white wine", "parmesan cheese", "vegetable broth", "onion", "butter"],
+      "description": "Creamy, slow-stirred Italian rice dish with earthy mushrooms and rich parmesan cheese.",
+      "link": "https://www.allrecipes.com/search?q=mushroom+risotto",
+      "image": "images/meals/mushroom-risotto.jpg"
+    },
+    {
+      "name": "Pulled Pork Sandwich",
+      "allergens": ["gluten"],
+      "ingredients": ["pork shoulder", "bbq sauce", "burger buns", "coleslaw", "apple cider vinegar", "brown sugar"],
+      "description": "Slow-smoked, tender pulled pork piled high on a bun with tangy barbecue sauce and crunchy slaw.",
+      "link": "https://www.allrecipes.com/search?q=pulled+pork+sandwich",
+      "image": "images/meals/pulled-pork-sandwich.jpg"
+    },
+    {
+      "name": "Vegetable Lasagna",
+      "allergens": ["gluten", "dairy", "egg"],
+      "ingredients": ["lasagna noodles", "ricotta cheese", "mozzarella cheese", "spinach", "zucchini", "marinara sauce", "eggs"],
+      "description": "Layers of pasta, creamy ricotta, and roasted vegetables baked in marinara and melted cheese.",
+      "link": "https://www.allrecipes.com/search?q=vegetable+lasagna",
+      "image": "images/meals/vegetable-lasagna.jpg"
+    },
+    {
+      "name": "Korean Bibimbap",
+      "allergens": ["soy", "egg", "sesame"],
+      "ingredients": ["rice", "beef", "spinach", "carrots", "bean sprouts", "fried egg", "gochujang", "sesame oil"],
+      "description": "A vibrant Korean rice bowl topped with seasoned vegetables, beef, a fried egg, and spicy gochujang sauce.",
+      "link": "https://www.allrecipes.com/search?q=bibimbap",
+      "image": "images/meals/korean-bibimbap.jpg"
+    },
+    {
+      "name": "Clam Chowder",
+      "allergens": ["shellfish", "dairy", "gluten"],
+      "ingredients": ["clams", "potatoes", "heavy cream", "bacon", "onion", "celery", "flour"],
+      "description": "A creamy New England-style soup loaded with tender clams, potatoes, and smoky bacon.",
+      "link": "https://www.allrecipes.com/search?q=clam+chowder",
+      "image": "images/meals/clam-chowder.jpg"
+    },
+    {
+      "name": "Chicken Parmesan",
+      "allergens": ["gluten", "dairy", "egg"],
+      "ingredients": ["chicken breast", "breadcrumbs", "eggs", "mozzarella cheese", "parmesan cheese", "marinara sauce", "spaghetti"],
+      "description": "Crispy breaded chicken cutlets topped with marinara and melted cheese, served over pasta.",
+      "link": "https://www.allrecipes.com/search?q=chicken+parmesan",
+      "image": "images/meals/chicken-parmesan.jpg"
+    },
+    {
+      "name": "Black Bean Quesadillas",
+      "allergens": ["gluten", "dairy"],
+      "ingredients": ["black beans", "tortillas", "cheddar cheese", "bell peppers", "onion", "cumin", "salsa"],
+      "description": "Crispy tortillas filled with melted cheese and seasoned black beans, a quick vegetarian meal.",
+      "link": "https://www.allrecipes.com/search?q=black+bean+quesadillas",
+      "image": "images/meals/black-bean-quesadillas.jpg"
+    },
+    {
+      "name": "Lamb Gyro",
+      "allergens": ["gluten", "dairy"],
+      "ingredients": ["lamb", "pita bread", "tzatziki sauce", "tomato", "red onion", "cucumber", "oregano"],
+      "description": "Seasoned, thinly sliced lamb wrapped in warm pita with cool, creamy tzatziki and fresh vegetables.",
+      "link": "https://www.allrecipes.com/search?q=lamb+gyro",
+      "image": "images/meals/lamb-gyro.jpg"
+    },
+    {
+      "name": "Vegetable Fried Rice",
+      "allergens": ["soy", "egg"],
+      "ingredients": ["rice", "eggs", "carrots", "peas", "scallions", "soy sauce", "garlic", "sesame oil"],
+      "description": "A quick and flavorful fried rice loaded with vegetables and scrambled egg, tossed in savory soy sauce.",
+      "link": "https://www.allrecipes.com/search?q=vegetable+fried+rice",
+      "image": "images/meals/vegetable-fried-rice.jpg"
+    },
+    {
+      "name": "Baked Ziti",
+      "allergens": ["gluten", "dairy"],
+      "ingredients": ["ziti pasta", "ricotta cheese", "mozzarella cheese", "marinara sauce", "italian sausage", "parmesan cheese"],
+      "description": "A comforting baked pasta dish layered with cheese, marinara, and savory sausage.",
+      "link": "https://www.allrecipes.com/search?q=baked+ziti",
+      "image": "images/meals/baked-ziti.jpg"
+    },
+    {
+      "name": "Chicken Shawarma",
+      "allergens": ["gluten", "dairy"],
+      "ingredients": ["chicken thighs", "yogurt", "garlic", "cumin", "paprika", "pita bread", "tahini sauce"],
+      "description": "Marinated, spiced chicken roasted until crisp and served in warm pita with creamy tahini sauce.",
+      "link": "https://www.allrecipes.com/search?q=chicken+shawarma",
+      "image": "images/meals/chicken-shawarma.jpg"
+    },
+    {
+      "name": "Split Pea Soup",
+      "allergens": [],
+      "ingredients": ["split peas", "ham hock", "carrots", "celery", "onion", "garlic", "vegetable broth"],
+      "description": "A thick, hearty soup of split peas and smoky ham, simmered low and slow for deep flavor.",
+      "link": "https://www.allrecipes.com/search?q=split+pea+soup",
+      "image": "images/meals/split-pea-soup.jpg"
+    },
+    {
+      "name": "Chicken Pot Pie",
+      "allergens": ["gluten", "dairy", "egg"],
+      "ingredients": ["chicken breast", "pie crust", "carrots", "peas", "celery", "heavy cream", "chicken broth"],
+      "description": "A comforting classic with tender chicken and vegetables in a creamy sauce, baked in a flaky crust.",
+      "link": "https://www.allrecipes.com/search?q=chicken+pot+pie",
+      "image": "images/meals/chicken-pot-pie.jpg"
+    },
+    {
+      "name": "Vegan Buddha Bowl",
+      "allergens": ["sesame"],
+      "ingredients": ["quinoa", "chickpeas", "sweet potato", "kale", "avocado", "tahini", "lemon juice"],
+      "description": "A nourishing bowl of roasted vegetables, chickpeas, and quinoa drizzled with a creamy tahini dressing.",
+      "link": "https://www.allrecipes.com/search?q=vegan+buddha+bowl",
+      "image": "images/meals/vegan-buddha-bowl.jpg"
+    },
+    {
+      "name": "Pork Schnitzel",
+      "allergens": ["gluten", "egg", "dairy"],
+      "ingredients": ["pork cutlets", "breadcrumbs", "eggs", "flour", "lemon", "butter"],
+      "description": "Thin pork cutlets breaded and pan-fried until golden and crispy, served with a squeeze of lemon.",
+      "link": "https://www.allrecipes.com/search?q=pork+schnitzel",
+      "image": "images/meals/pork-schnitzel.jpg"
+    },
+    {
+      "name": "Shakshuka",
+      "allergens": ["egg"],
+      "ingredients": ["eggs", "tomatoes", "bell peppers", "onion", "garlic", "cumin", "paprika", "feta cheese"],
+      "description": "Eggs poached in a spiced tomato and pepper sauce, a comforting Middle Eastern breakfast dish.",
+      "link": "https://www.allrecipes.com/search?q=shakshuka",
+      "image": "images/meals/shakshuka.jpg"
+    },
+    {
+      "name": "Teriyaki Chicken",
+      "allergens": ["soy", "gluten"],
+      "ingredients": ["chicken thighs", "soy sauce", "mirin", "brown sugar", "garlic", "ginger", "rice"],
+      "description": "Juicy chicken glazed in a sweet and savory teriyaki sauce, served over steamed rice.",
+      "link": "https://www.allrecipes.com/search?q=teriyaki+chicken",
+      "image": "images/meals/teriyaki-chicken.jpg"
+    }
+  ]
+}
