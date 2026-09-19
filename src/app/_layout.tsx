@@ -28,6 +28,13 @@ export default function RootLayout() {
           presentation: "modal",
         }}
       />
+      <Stack.Screen
+        name="add-meal"
+        options={{
+          title: "add meal",
+          presentation: "modal",
+        }}
+      />
     </Stack>
   );
 }
