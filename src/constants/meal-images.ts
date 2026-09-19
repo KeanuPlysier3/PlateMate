@@ -1,0 +1,56 @@
+// Auto-generated static require() map for every bundled meal image under
+// src/assets/images/meals/, plus the placeholder. React Native cannot do
+// require(someVariable) — the bundler needs a literal string path at build
+// time — so a meal.image value like "images/meals/x.jpg" has to be looked
+// up in this map to get its actual require()d module, instead of being
+// require()d directly from dynamic data.
+import type { ImageSourcePropType } from "react-native";
+
+export const mealImageMap: Record<string, ImageSourcePropType> = {
+  "images/meal-placeholder.png": require("@/assets/images/meal-placeholder.png"),
+  "images/meals/baked-ziti.jpg": require("@/assets/images/meals/baked-ziti.jpg"),
+  "images/meals/beef-and-broccoli.jpg": require("@/assets/images/meals/beef-and-broccoli.jpg"),
+  "images/meals/beef-bourguignon.jpg": require("@/assets/images/meals/beef-bourguignon.jpg"),
+  "images/meals/beef-tacos.jpg": require("@/assets/images/meals/beef-tacos.jpg"),
+  "images/meals/black-bean-quesadillas.jpg": require("@/assets/images/meals/black-bean-quesadillas.jpg"),
+  "images/meals/butter-chicken.jpg": require("@/assets/images/meals/butter-chicken.jpg"),
+  "images/meals/caprese-salad.jpg": require("@/assets/images/meals/caprese-salad.jpg"),
+  "images/meals/chicken-caesar-salad.jpg": require("@/assets/images/meals/chicken-caesar-salad.jpg"),
+  "images/meals/chicken-fajitas.jpg": require("@/assets/images/meals/chicken-fajitas.jpg"),
+  "images/meals/chicken-noodle-soup.jpg": require("@/assets/images/meals/chicken-noodle-soup.jpg"),
+  "images/meals/chicken-parmesan.jpg": require("@/assets/images/meals/chicken-parmesan.jpg"),
+  "images/meals/chicken-pot-pie.jpg": require("@/assets/images/meals/chicken-pot-pie.jpg"),
+  "images/meals/chicken-shawarma.jpg": require("@/assets/images/meals/chicken-shawarma.jpg"),
+  "images/meals/chicken-tikka-masala.jpg": require("@/assets/images/meals/chicken-tikka-masala.jpg"),
+  "images/meals/chili-con-carne.jpg": require("@/assets/images/meals/chili-con-carne.jpg"),
+  "images/meals/clam-chowder.jpg": require("@/assets/images/meals/clam-chowder.jpg"),
+  "images/meals/classic-beef-burger.jpg": require("@/assets/images/meals/classic-beef-burger.jpg"),
+  "images/meals/classic-spaghetti-carbonara.jpg": require("@/assets/images/meals/classic-spaghetti-carbonara.jpg"),
+  "images/meals/eggplant-parmesan.jpg": require("@/assets/images/meals/eggplant-parmesan.jpg"),
+  "images/meals/falafel-wrap.jpg": require("@/assets/images/meals/falafel-wrap.jpg"),
+  "images/meals/fish-and-chips.jpg": require("@/assets/images/meals/fish-and-chips.jpg"),
+  "images/meals/greek-salad.jpg": require("@/assets/images/meals/greek-salad.jpg"),
+  "images/meals/grilled-cheese-sandwich.jpg": require("@/assets/images/meals/grilled-cheese-sandwich.jpg"),
+  "images/meals/korean-bibimbap.jpg": require("@/assets/images/meals/korean-bibimbap.jpg"),
+  "images/meals/lamb-gyro.jpg": require("@/assets/images/meals/lamb-gyro.jpg"),
+  "images/meals/lentil-soup.jpg": require("@/assets/images/meals/lentil-soup.jpg"),
+  "images/meals/margherita-flatbread.jpg": require("@/assets/images/meals/margherita-flatbread.jpg"),
+  "images/meals/margherita-pizza.jpg": require("@/assets/images/meals/margherita-pizza.jpg"),
+  "images/meals/miso-glazed-salmon.jpg": require("@/assets/images/meals/miso-glazed-salmon.jpg"),
+  "images/meals/mushroom-risotto.jpg": require("@/assets/images/meals/mushroom-risotto.jpg"),
+  "images/meals/pork-carnitas.jpg": require("@/assets/images/meals/pork-carnitas.jpg"),
+  "images/meals/pork-schnitzel.jpg": require("@/assets/images/meals/pork-schnitzel.jpg"),
+  "images/meals/pulled-pork-sandwich.jpg": require("@/assets/images/meals/pulled-pork-sandwich.jpg"),
+  "images/meals/ratatouille.jpg": require("@/assets/images/meals/ratatouille.jpg"),
+  "images/meals/shakshuka.jpg": require("@/assets/images/meals/shakshuka.jpg"),
+  "images/meals/shrimp-scampi.jpg": require("@/assets/images/meals/shrimp-scampi.jpg"),
+  "images/meals/split-pea-soup.jpg": require("@/assets/images/meals/split-pea-soup.jpg"),
+  "images/meals/sushi-rolls-california-roll.jpg": require("@/assets/images/meals/sushi-rolls-california-roll.jpg"),
+  "images/meals/teriyaki-chicken.jpg": require("@/assets/images/meals/teriyaki-chicken.jpg"),
+  "images/meals/thai-green-curry.jpg": require("@/assets/images/meals/thai-green-curry.jpg"),
+  "images/meals/vegan-buddha-bowl.jpg": require("@/assets/images/meals/vegan-buddha-bowl.jpg"),
+  "images/meals/vegetable-fried-rice.jpg": require("@/assets/images/meals/vegetable-fried-rice.jpg"),
+  "images/meals/vegetable-lasagna.jpg": require("@/assets/images/meals/vegetable-lasagna.jpg"),
+  "images/meals/vegetable-pad-thai.jpg": require("@/assets/images/meals/vegetable-pad-thai.jpg"),
+  "images/meals/vegetable-stir-fry.jpg": require("@/assets/images/meals/vegetable-stir-fry.jpg"),
+};

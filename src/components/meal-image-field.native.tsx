@@ -30,7 +30,7 @@ export default function MealImageField({ onImagePathChange }: MealImageFieldProp
     mealsDir.create({ idempotent: true });//idempotent: true means that if the directory already exists, it won't throw an error
 
     const fileName = `${Date.now()}.jpg`;//unique filename
-    
+
     const destination = new File(mealsDir, fileName);
     // Create a File object representing the new file location
     // inside the meals directory, using the unique filename.
@@ -39,6 +39,15 @@ export default function MealImageField({ onImagePathChange }: MealImageFieldProp
     // Create a File object representing the image that was
     // selected by the image picker, using its URI as its location.
     sourceFile.copy(destination); //copy the picked image to the new destination file in the meals directory
+
+    //delete any previously selected image file from the meals directory, if there was one, to avoid cluttering the app's storage with unused images. This is a best-effort cleanup; if the old file is already gone for some reason, there's nothing left to do.
+    if (previewUri) {
+      try {
+        new File(previewUri).delete();//refers to the location of the previously selected image file in the meals directory, and deletes it
+      } catch {
+
+      }
+    }
 
     setPreviewUri(destination.uri);
     onImagePathChange(destination.uri);

@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import MealImageField from "@/components/meal-image-field";
+import { CUSTOM_MEALS_STORAGE_KEY, LAST_ADDED_MEAL_STORAGE_KEY } from "@/constants/storage";
 import type { Meal } from "@/types/meal";
 
 // Every Meal field is required to fill in the form EXCEPT allergens and image
@@ -15,11 +16,6 @@ type RequiredMealField = Exclude<keyof Meal, "allergens" | "image">;
 // Bundled fallback used when the user doesn't pick a photo. Stored the same
 // way the 45 seeded meals store their images: a path relative to `@/assets/`.
 const PLACEHOLDER_IMAGE = "images/meal-placeholder.png";
-
-// All user-added meals live under this one AsyncStorage key, as a single
-// JSON-serialized Meal[] — merging this with the bundled meals.json into one
-// combined list (e.g. for the dropdown) is a later step, not part of this one.
-const CUSTOM_MEALS_STORAGE_KEY = "customMeals";
 
 const splitCommaList = (value: string): string[] =>
   value
@@ -52,7 +48,7 @@ export default function AddMeal() {
       return;
     }
 
-    setIsSaving(true);
+    setIsSaving(true); //prevent multiple submissions while saving
     try {
       const newMeal: Meal = {
         name: name.trim(),
@@ -70,6 +66,9 @@ export default function AddMeal() {
         CUSTOM_MEALS_STORAGE_KEY,
         JSON.stringify(customMeals),
       );
+      // Read by planner.tsx's focus effect to auto-select this meal once
+      // we've navigated back, then cleared there so it only fires once.
+      await AsyncStorage.setItem(LAST_ADDED_MEAL_STORAGE_KEY, newMeal.name);
 
       router.back();
     } catch (error) {

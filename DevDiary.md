@@ -490,3 +490,155 @@ Checked the actual web bundle output afterward: `expo-file-system` and `launchIm
 - `tsc --noEmit` — clean.
 - `npx expo export --platform web` — successful build.
 - Grepped the exported web bundle for `expo-file-system`/`launchImageLibraryAsync` — 0 matches, confirming the native-only code is excluded from the web build entirely, not just inert.
+
+## Entry 20 — Merged bundled meals + AsyncStorage custom meals into the dropdown
+
+**Date:** 2026-09-19
+
+**Prompt given:**
+> "ok now back to the planner page, we should now find a way to merge both places where meals exist the default meals and the custom ones. and then show those inside the dropdown. This means that we just need to add asyncstorage and use get on there with the already existing custommealsstoragekey.After importing the asyncStorage date simply push it into the existing data."
+
+
+### What I built instead
+
+- **`src/constants/storage.ts`** — new file exporting `CUSTOM_MEALS_STORAGE_KEY = "customMeals"`. Both `add-meal.tsx` and `(tabs)/planner.tsx` now import it from here instead of `add-meal.tsx` privately owning the string.
+- **`(tabs)/planner.tsx`**:
+  - Renamed the top-level `meals: Meal[]` (the direct `meals.json` import) to `bundledMeals`, freeing up the name `meals` for a new piece of component state — the actual combined list the Dropdown reads from.
+  - Added `useFocusEffect(useCallback(() => { ... }, []))` (from `expo-router`) that reads `CUSTOM_MEALS_STORAGE_KEY` via `AsyncStorage.getItem`, `JSON.parse`s it (defaulting to `[]` if nothing's stored yet — same as the read side of the pattern already used in `add-meal.tsx`), and calls `setMeals([...bundledMeals, ...customMeals])`.
+  - Used `useFocusEffect` rather than a plain `useEffect(() => {...}, [])`: since Planner is a tab screen, it stays mounted the whole time the app runs — a mount-only effect would only ever read AsyncStorage once, on first load, and would never notice a meal added later via the Add Meal modal. `useFocusEffect` re-runs this read every time the user navigates back to this screen, so a newly added meal shows up in the dropdown immediately after returning from `add-meal.tsx`, no app restart needed.
+  - The `Dropdown`'s `data={meals}` now automatically reflects the merged list, since it already referenced the (now state-backed) `meals` variable — no JSX changes needed there at all.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 21 — Meal overview screen (image, name, description, ingredients, allergens)
+
+**Date:** 2026-09-19
+
+**Prompt given:**
+> "alright The idea is that when a meal is selected the UI changes again to the meals overview with all displayed. This includes the image, description, name, etc."
+
+### The infrastructure problem this needed first
+
+Displaying a meal's image turned out to need a small piece of plumbing before any UI work: React Native's `<Image source={require(...)}>` requires a **literal, static string** at bundle time — Metro can't resolve `require(someVariable)`. The 45 seeded meals store `image` as a relative string like `"images/meals/baked-ziti.jpg"` (from Entry 8), which is exactly that kind of dynamic value at runtime (it comes from `meal.image`, not a hardcoded string in the source).
+
+- **`src/constants/meal-images.ts`** — generated (via a one-off Node script, not typed by hand) a `Record<string, ImageSourcePropType>` with one literal `require("@/assets/images/meals/<file>")` line per actual file in `assets/images/meals/`, plus the placeholder — 46 entries total. This is the static lookup table that bridges "a string from data" to "an actual bundled image module."
+- **`src/utils/resolve-meal-image.ts`** — `resolveMealImage(image: string)`: if the string looks like a URI the platform already knows how to load directly (`file://`, `data:`, `blob:` — i.e. a user-added meal's photo per Entries 15–19), returns `{ uri: image }`; otherwise looks it up in `mealImageMap` (a bundled seed meal or the placeholder), falling back to the placeholder entry if a path is ever missing from the map.
+
+### The UI itself, in `(tabs)/planner.tsx`
+
+- Replaced `selectedMealName: string` with `selectedMeal: Meal | null` — the Dropdown's `onChange` already receives the full matched object from its `data` array, so this is just keeping the whole `Meal`, not just its name, once one's chosen.
+- When `selectedMeal` is set, the dropdown/divider/add-meal-button block is replaced entirely with a meal overview: the resolved image, name, description, ingredients (`.join(", ")`), and allergens (joined, or "Geen bekende allergenen" if the array's empty) — plus a "Kies andere maaltijd" button that clears `selectedMeal` back to `null`, returning to the dropdown.
+- `handleReset` (the existing date-reset back arrow) now also clears `selectedMeal`, so backing out to re-pick a date doesn't leave a stale meal selected underneath.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 22 — Auto-select a meal right after it's created
+
+**Date:** 2026-09-19
+
+**Prompt given:**
+> "ok now when i meal is created by the user that meal should automatically be selected is that possible if so how?"
+
+### The mechanism
+
+Expo Router doesn't have a built-in way to "return a value" from a modal back to the screen that opened it (unlike, say, a function call returning something) — `router.back()` just navigates, it doesn't carry data with it. But Planner already re-reads AsyncStorage every time it regains focus (Entry 20's `useFocusEffect`), so I piggybacked on that existing mechanism instead of introducing a new one.
+
+- **`src/constants/storage.ts`** — added `LAST_ADDED_MEAL_STORAGE_KEY = "lastAddedMealName"`, alongside the existing `CUSTOM_MEALS_STORAGE_KEY`.
+- **`add-meal.tsx`** — right after successfully writing the updated `customMeals` array, also writes `newMeal.name` under this new key, just before `router.back()`.
+- **`(tabs)/planner.tsx`**'s focus effect — after merging `bundledMeals` + `customMeals` into `allMeals` as before, it now also checks `LAST_ADDED_MEAL_STORAGE_KEY`. If a name is there, it finds that meal in `allMeals` and calls `setSelectedMeal(...)` — immediately showing Entry 21's meal overview screen instead of the dropdown — then removes the key from storage, so navigating back to Planner *again* later (without having just added something) doesn't re-trigger the auto-select.
+
+### Why a storage marker instead of, say, route params
+
+Considered passing the new meal's name back via `router` params instead, but Planner is a persistently-mounted tab screen, not a fresh route instance each time — the "read once, then clear" marker pattern fits naturally with the read-on-focus mechanism that already existed, without needing to reason about how param-passing interacts with a screen that's technically already mounted underneath the modal the whole time.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 23 — Cleanup: removed dead data:/blob: checks from resolveMealImage
+
+**Date:** 2026-09-19
+
+**Prompt given:**
+> "why th data and blob?" (questioning the `data:`/`blob:` checks in `resolve-meal-image.ts`)
+
+You were right to push on this. Those checks were leftover from the base64 `data:` URI approach (Entries 17–18), which was fully reverted in favor of making image picking native-only. Since `meal-image-field.tsx` (the web version) never calls `onImagePathChange`, no code path in the app produces a `data:` or `blob:` value anymore — only `file://` (native) does. Keeping those checks was dead code, and slightly misleading (implying web-added meals could have a real custom photo, when they can't).
+
+### What changed
+
+`src/utils/resolve-meal-image.ts`: narrowed the check to `image.startsWith("file://")` only, removed the `data:`/`blob:` branches, and updated the comment to reflect current reality (two cases: native `file://` URIs, or `@/assets/`-relative paths covering seed meals, the placeholder, and web-added meals alike).
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+
+## Entry 24 — Meal overview uses the same back-arrow style as the date screen
+
+**Date:** 2026-09-19
+
+**Prompt given:**
+> "ok great now once a meal was selected you added the kies andere maaltijd button. I want you to replace it with the same button used after selecting a date and just use the current onPress"
+
+### What changed
+
+In `(tabs)/planner.tsx`, replaced the "Kies andere maaltijd" text button (border + label) in the meal overview with the same top-left chevron-arrow `Pressable`/`SymbolView` combo already used for the date-reset back button — same `styles.backButton`, same icon (`chevron.left`/`arrow_back`), same `size`/`tintColor`/`hitSlop`. Only the `onPress` differs, and that was already correct (`() => setSelectedMeal(null)`), so it's unchanged.
+
+Removed the now-unused `changeMealButton`/`changeMealButtonText` styles.
+
+### Why
+
+Keeps the two "go back a step" affordances in the flow (leave the date, leave the meal selection) visually consistent with each other, rather than one being an icon-only arrow and the other a bordered text button.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 25 — Meal overview replaces the date step entirely, plus a "Plan maaltijd" button
+
+**Date:** 2026-09-19
+
+**Prompt given:**
+> "i want you to tweak that the button should be on the exact same location as the previous back button. That means the entire previous step of the component should be gone. we will a large button underneathe the meal details that contains says plan meal on "selected date""
+
+### What changed
+
+Restructured the `selectedDate` branch in `(tabs)/planner.tsx` from a single block with an *always-visible* date-reset back arrow + date text, with the dropdown-vs-meal-overview choice nested inside it — into a top-level `selectedMeal ? (...) : (...)` split, so the two states are now fully separate render paths rather than one sharing a common header:
+
+- **No meal selected yet**: back arrow (`handleReset`, resets the whole date) + the selected date text + dropdown + divider + Add Meal button — unchanged from before.
+- **Meal selected**: the back arrow now sits in the *exact same position* (`styles.backButton`, same spot in the layout) but its `onPress` is `() => setSelectedMeal(null)` instead of `handleReset` — going back one step (to meal choice) rather than all the way back to date choice. The date text is gone entirely in this state, per your instruction that "the entire previous step" should disappear, not just be visually similar. Below the meal details (image/name/description/ingredients/allergens), added a new full-width "Plan maaltijd op `<formatted date>`" button (`styles.planMealButton`).
+- Extracted the repeated date-formatting object into a shared `formatDate(date: Date)` helper, since the same `weekday/day/month/year` formatting is now needed in two places (the date-picker step's heading, and the new plan-button's label) instead of one.
+
+The "Plan maaltijd" button has no `onPress` yet — this entry is the layout/structure change only; what "planning" a meal onto a date actually *does* (presumably persisting that assignment somewhere) hasn't been discussed or built yet.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 26 — Made the Planner page scrollable
+
+**Date:** 2026-09-19
+
+**Prompt given:**
+> "make scrolling possible on the page"
+
+### What changed
+
+Swapped the outer `<View>` in `(tabs)/planner.tsx` for a `<ScrollView>` — necessary since the meal overview (image + name + description + ingredients + allergens + the new "Plan maaltijd" button from Entry 25) can now be taller than the screen on smaller devices, and a plain `View` has no scrolling behavior at all; content would just get clipped.
+
+Two style adjustments that go along with a `ScrollView` specifically:
+- `style={styles.scrollView}` (`{ flex: 1 }`) on the `ScrollView` itself — controls the size of the scrollable *viewport*.
+- The existing `container` style (previously applied via `style` on the `View`) moved to `contentContainerStyle` instead, and its `flex: 1` changed to `flexGrow: 1`. This distinction matters: `contentContainerStyle` describes the layout of the *content inside* the scroll area, not the viewport — `flex: 1` there would try to force the content to exactly match the viewport's height (defeating scrolling for genuinely tall content), whereas `flexGrow: 1` lets it fill the available space when content is short, while still being free to grow taller and scroll when content exceeds the screen.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
