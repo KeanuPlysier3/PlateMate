@@ -14,3 +14,9 @@ export const LAST_ADDED_MEAL_STORAGE_KEY = "lastAddedMealName";
 // button; read wherever a planned meal needs to be shown (e.g. Home's
 // upcoming-7-days list, later).
 export const PLANNED_MEALS_STORAGE_KEY = "plannedMeals";
+
+// A single JSON-serialized string[] of the user's allergies — both the
+// common toggleable tags and any custom ones typed in, stored together as
+// one flat list (see profile.tsx). Written whenever an allergen is toggled
+// or added; nothing else reads it yet.
+export const ALLERGIES_STORAGE_KEY = "allergies";

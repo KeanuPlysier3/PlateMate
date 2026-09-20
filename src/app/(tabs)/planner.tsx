@@ -22,6 +22,7 @@ import {
   PLANNED_MEALS_STORAGE_KEY,
 } from "@/constants/storage";
 import { resolveMealImage } from "@/utils/resolve-meal-image";
+import { toDateKey, getStartOfToday, formatDate } from "@/utils/date";
 import type { Meal } from "@/types/meal";
 import type { PlannedMeals } from "@/types/planned-meal";
 
@@ -31,27 +32,6 @@ import type { PlannedMeals } from "@/types/planned-meal";
 const bundledMeals: Meal[] = mealsData.meals;
 
 const ACCENT_COLOR = "#007AFF";
-
-const toDateKey = (date: Date) => {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0"); //add 1 to month because js indexes months from 0
-  const day = `${date.getDate()}`.padStart(2, "0"); //padStart to ensure day is always 2 digits
-  return `${year}-${month}-${day}`;
-};
-
-const getStartOfToday = () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
-};
-
-const formatDate = (date: Date) =>
-  date.toLocaleDateString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
 
 export default function Planner() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -70,7 +50,7 @@ export default function Planner() {
     if (!showPlannedToast) {
       return;
     }
-    const timeoutId = setTimeout(() => setShowPlannedToast(false), 3000);
+    const timeoutId = setTimeout(() => setShowPlannedToast(false), 3000);//dismiss after 3 seconds
     return () => clearTimeout(timeoutId);
   }, [showPlannedToast]);
 
@@ -212,7 +192,7 @@ export default function Planner() {
                 <Text style={styles.planMealButtonText}>
                   {isPlanningMeal
                     ? "Bezig met plannen..."
-                    : `Plan maaltijd op ${formatDate(selectedDate)}`}
+                    : `Plan on ${formatDate(selectedDate)}`}
                 </Text>
               </Pressable>
             </>
@@ -252,7 +232,7 @@ export default function Planner() {
 
               <View style={styles.dividerRow}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>-of-</Text>
+                <Text style={styles.dividerText}>of</Text>
                 <View style={styles.dividerLine} />
               </View>
 
