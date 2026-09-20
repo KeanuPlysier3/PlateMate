@@ -1,15 +1,30 @@
-import { useCallback, useState } from "react";
-import { Text, View, StyleSheet, Pressable, Image, ScrollView } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Text,
+  View,
+  StyleSheet,
+  Pressable,
+  Image,
+  ScrollView,
+} from "react-native";
 import { Link, useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Calendar, type DateData } from "react-native-calendars";
 import { Dropdown } from "react-native-element-dropdown";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Haptics from "expo-haptics";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import mealsData from "@/data/meals.json";
-import { CUSTOM_MEALS_STORAGE_KEY, LAST_ADDED_MEAL_STORAGE_KEY } from "@/constants/storage";
+import {
+  CUSTOM_MEALS_STORAGE_KEY,
+  LAST_ADDED_MEAL_STORAGE_KEY,
+  PLANNED_MEALS_STORAGE_KEY,
+} from "@/constants/storage";
 import { resolveMealImage } from "@/utils/resolve-meal-image";
+import { toDateKey, getStartOfToday, formatDate } from "@/utils/date";
 import type { Meal } from "@/types/meal";
+import type { PlannedMeals } from "@/types/planned-meal";
 
 // Typing this assignment as Meal[] makes TypeScript check every entry in
 // meals.json against the Meal shape (name/allergens/ingredients/description/link/image)
@@ -18,54 +33,55 @@ const bundledMeals: Meal[] = mealsData.meals;
 
 const ACCENT_COLOR = "#007AFF";
 
-const toDateKey = (date: Date) => {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0"); //add 1 to month because js indexes months from 0
-  const day = `${date.getDate()}`.padStart(2, "0"); //padStart to ensure day is always 2 digits
-  return `${year}-${month}-${day}`;
-};
-
-const getStartOfToday = () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
-};
-
-const formatDate = (date: Date) =>
-  date.toLocaleDateString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
 export default function Planner() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [pendingDate, setPendingDate] = useState<Date>(getStartOfToday);//initialize pendingDate to the start of today
+  const [pendingDate, setPendingDate] = useState<Date>(getStartOfToday); //initialize pendingDate to the start of today
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
-  const [meals, setMeals] = useState<Meal[]>(bundledMeals);//initialize meals state with bundledMeals
+  const [meals, setMeals] = useState<Meal[]>(bundledMeals); //initialize meals state with bundledMeals
+  const [isPlanningMeal, setIsPlanningMeal] = useState(false);
+  const [showPlannedToast, setShowPlannedToast] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  // Auto-dismiss the "planned" toast after 3 seconds. Re-runs whenever
+  // showPlannedToast changes, so planning a second meal while the first
+  // toast is still visible restarts the 3-second window instead of the two
+  // timers fighting each other.
+  useEffect(() => {
+    if (!showPlannedToast) {
+      return;
+    }
+    const timeoutId = setTimeout(() => setShowPlannedToast(false), 3000);//dismiss after 3 seconds
+    return () => clearTimeout(timeoutId);
+  }, [showPlannedToast]);
 
   // Re-reads AsyncStorage every time this screen gains focus (not just once
   // on mount) so a meal added via the add-meal modal shows up in the
   // dropdown as soon as you navigate back to Planner, without needing to
   // restart the app — the tab screen itself stays mounted the whole time,
   useFocusEffect(
-    useCallback(() => {//this prevents the useFocusEffect from being called multiple times when the component re-renders
+    useCallback(() => {
+      //this prevents the useFocusEffect from being called multiple times when the component re-renders
       let isActive = true;
 
       (async () => {
-        const storedValue = await AsyncStorage.getItem(CUSTOM_MEALS_STORAGE_KEY);//storedValue is a stringified JSON array of custom meals, or null if no custom meals have been added yet
+        const storedValue = await AsyncStorage.getItem(
+          CUSTOM_MEALS_STORAGE_KEY,
+        ); //storedValue is a stringified JSON array of custom meals, or null if no custom meals have been added yet
         const customMeals: Meal[] = storedValue ? JSON.parse(storedValue) : [];
         const allMeals = [...bundledMeals, ...customMeals];
-        if (!isActive) { //if the component is no longer active (unmounted), we don't want to update state
+        if (!isActive) {
+          //if the component is no longer active (unmounted), we don't want to update state
           return;
         }
         setMeals(allMeals);
 
-    
-        const lastAddedMealName = await AsyncStorage.getItem(LAST_ADDED_MEAL_STORAGE_KEY);//set in add-meal.tsx 
+        const lastAddedMealName = await AsyncStorage.getItem(
+          LAST_ADDED_MEAL_STORAGE_KEY,
+        ); //set in add-meal.tsx
         if (lastAddedMealName && isActive) {
-          const justAddedMeal = allMeals.find((meal) => meal.name === lastAddedMealName);
+          const justAddedMeal = allMeals.find(
+            (meal) => meal.name === lastAddedMealName,
+          );
           if (justAddedMeal) {
             setSelectedMeal(justAddedMeal);
           }
@@ -89,127 +105,204 @@ export default function Planner() {
     setSelectedMeal(null);
   };
 
+  const handlePlanMeal = async () => {
+    if (!selectedDate || !selectedMeal || isPlanningMeal) {
+      return;
+    }
+
+    setIsPlanningMeal(true);
+    try {
+      const storedValue = await AsyncStorage.getItem(PLANNED_MEALS_STORAGE_KEY);
+      const plannedMeals: PlannedMeals = storedValue
+        ? JSON.parse(storedValue)
+        : {};
+      plannedMeals[toDateKey(selectedDate)] = selectedMeal; //overwrites any meal already planned for this date, by design — one meal per date
+      await AsyncStorage.setItem(
+        PLANNED_MEALS_STORAGE_KEY,
+        JSON.stringify(plannedMeals),
+      );
+
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowPlannedToast(true);
+      handleReset();
+    } finally {
+      setIsPlanningMeal(false);
+    }
+  };
+
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={[
-        styles.container,
-        selectedDate ? styles.containerSelected : styles.containerPicking,
-      ]}
-    >
-      {selectedDate ? (
-        selectedMeal ? (
-          <>
-            <Pressable
-              style={styles.backButton}
-              onPress={() => setSelectedMeal(null)}
-              hitSlop={8}
-            >
-              <SymbolView
-                name={{ ios: "chevron.left", android: "arrow_back", web: "arrow_back" }}
-                size={26}
-                tintColor="black"
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.container,
+          selectedDate ? styles.containerSelected : styles.containerPicking,
+        ]}
+      >
+        {selectedDate ? (
+          selectedMeal ? (
+            <>
+              <Pressable
+                style={styles.backButton}
+                onPress={() => setSelectedMeal(null)}
+                hitSlop={8}
+              >
+                <SymbolView
+                  name={{
+                    ios: "chevron.left",
+                    android: "arrow_back",
+                    web: "arrow_back",
+                  }}
+                  size={26}
+                  tintColor="black"
+                />
+              </Pressable>
+
+              <View style={styles.mealOverview}>
+                <Image
+                  source={resolveMealImage(selectedMeal.image)}
+                  style={styles.mealImage}
+                />
+                <Text style={styles.mealName}>{selectedMeal.name}</Text>
+                <Text style={styles.mealDescription}>
+                  {selectedMeal.description}
+                </Text>
+
+                <Text style={styles.mealSectionLabel}>Ingrediënten</Text>
+                <Text style={styles.mealSectionText}>
+                  {selectedMeal.ingredients.join(", ")}
+                </Text>
+
+                <Text style={styles.mealSectionLabel}>Allergenen</Text>
+                <Text style={styles.mealSectionText}>
+                  {selectedMeal.allergens.length > 0
+                    ? selectedMeal.allergens.join(", ")
+                    : "Geen bekende allergenen"}
+                </Text>
+              </View>
+
+              <Pressable
+                style={[
+                  styles.planMealButton,
+                  isPlanningMeal && styles.planMealButtonDisabled,
+                ]}
+                onPress={handlePlanMeal}
+                disabled={isPlanningMeal}
+              >
+                <Text style={styles.planMealButtonText}>
+                  {isPlanningMeal
+                    ? "Bezig met plannen..."
+                    : `Plan on ${formatDate(selectedDate)}`}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Pressable
+                style={styles.backButton}
+                onPress={handleReset}
+                hitSlop={8}
+              >
+                <SymbolView
+                  name={{
+                    ios: "chevron.left",
+                    android: "arrow_back",
+                    web: "arrow_back",
+                  }}
+                  size={26}
+                  tintColor="black"
+                />
+              </Pressable>
+              <Text style={styles.selectedDate}>
+                {formatDate(selectedDate)}
+              </Text>
+
+              <Dropdown
+                style={styles.dropdown}
+                containerStyle={styles.dropdownContainer}
+                placeholderStyle={styles.dropdownText}
+                selectedTextStyle={styles.dropdownText}
+                itemTextStyle={styles.dropdownText}
+                data={meals}
+                labelField="name"
+                valueField="name"
+                placeholder="Meals"
+                onChange={(meal) => setSelectedMeal(meal)}
               />
-            </Pressable>
 
-            <View style={styles.mealOverview}>
-              <Image
-                source={resolveMealImage(selectedMeal.image)}
-                style={styles.mealImage}
-              />
-              <Text style={styles.mealName}>{selectedMeal.name}</Text>
-              <Text style={styles.mealDescription}>{selectedMeal.description}</Text>
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>of</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-              <Text style={styles.mealSectionLabel}>Ingrediënten</Text>
-              <Text style={styles.mealSectionText}>
-                {selectedMeal.ingredients.join(", ")}
-              </Text>
-
-              <Text style={styles.mealSectionLabel}>Allergenen</Text>
-              <Text style={styles.mealSectionText}>
-                {selectedMeal.allergens.length > 0
-                  ? selectedMeal.allergens.join(", ")
-                  : "Geen bekende allergenen"}
-              </Text>
-            </View>
-
-            <Pressable style={styles.planMealButton}>
-              <Text style={styles.planMealButtonText}>
-                Plan maaltijd op {formatDate(selectedDate)}
-              </Text>
-            </Pressable>
-          </>
+              <Link href="/add-meal" asChild>
+                <Pressable style={styles.addMealButton}>
+                  <Text style={styles.addMealButtonText}>+ Nieuw Recept</Text>
+                </Pressable>
+              </Link>
+            </>
+          )
         ) : (
           <>
-            <Pressable style={styles.backButton} onPress={handleReset} hitSlop={8}>
-              <SymbolView
-                name={{ ios: "chevron.left", android: "arrow_back", web: "arrow_back" }}
-                size={26}
-                tintColor="black"
-              />
-            </Pressable>
-            <Text style={styles.selectedDate}>{formatDate(selectedDate)}</Text>
-
-            <Dropdown
-              style={styles.dropdown}
-              containerStyle={styles.dropdownContainer}
-              placeholderStyle={styles.dropdownText}
-              selectedTextStyle={styles.dropdownText}
-              itemTextStyle={styles.dropdownText}
-              data={meals}
-              labelField="name"
-              valueField="name"
-              placeholder="Meals"
-              onChange={(meal) => setSelectedMeal(meal)}
+            <Calendar
+              style={styles.calendar}
+              minDate={toDateKey(getStartOfToday())} //todatekey is used to format the date to the format that the calendar component expects
+              markedDates={{
+                [toDateKey(pendingDate)]: {
+                  selected: true,
+                  selectedColor: ACCENT_COLOR,
+                },
+              }}
+              theme={{
+                todayTextColor: ACCENT_COLOR,
+                arrowColor: ACCENT_COLOR,
+                selectedDayBackgroundColor: ACCENT_COLOR,
+                weekVerticalMargin: 0,
+              }}
+              onDayPress={handleDayPress}
             />
-
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>-of-</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <Link href="/add-meal" asChild>
-              <Pressable style={styles.addMealButton}>
-                <Text style={styles.addMealButtonText}>+ Nieuw Recept</Text>
-              </Pressable>
-            </Link>
+            <Pressable
+              style={styles.confirmButton}
+              onPress={() => setSelectedDate(pendingDate)}
+            >
+              <Text style={styles.confirmButtonText}>Bevestigen</Text>
+            </Pressable>
           </>
-        )
-      ) : (
-        <>
-          <Calendar
-            style={styles.calendar}
-            minDate={toDateKey(getStartOfToday())}//todatekey is used to format the date to the format that the calendar component expects
-            markedDates={{
-              [toDateKey(pendingDate)]: {
-                selected: true,
-                selectedColor: ACCENT_COLOR,
-              },
-            }}
-            theme={{
-              todayTextColor: ACCENT_COLOR,
-              arrowColor: ACCENT_COLOR,
-              selectedDayBackgroundColor: ACCENT_COLOR,
-              weekVerticalMargin: 0,
-            }}
-            onDayPress={handleDayPress}
-          />
-          <Pressable
-            style={styles.confirmButton}
-            onPress={() => setSelectedDate(pendingDate)}
-          >
-            <Text style={styles.confirmButtonText}>Bevestigen</Text>
-          </Pressable>
-        </>
+        )}
+      </ScrollView>
+
+      {showPlannedToast && (
+        <View
+          style={[styles.toast, { bottom: 80 + insets.bottom }]}
+          pointerEvents="none"
+        >
+          <Text style={styles.toastText}>Maaltijd gepland!</Text>
+        </View>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
+  },
+  toast: {
+    position: "absolute",
+    alignSelf: "center",
+    backgroundColor: "#1c1c1e",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  toastText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
   },
   container: {
     flexGrow: 1,
@@ -227,7 +320,6 @@ const styles = StyleSheet.create({
   calendar: {
     width: "100%",
     borderRadius: 12,
-
   },
   backButton: {
     alignSelf: "flex-start",
@@ -284,6 +376,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#1c1c1e",
     alignItems: "center",
+  },
+  planMealButtonDisabled: {
+    backgroundColor: "#aaa",
   },
   planMealButtonText: {
     color: "#fff",

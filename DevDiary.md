@@ -1,5 +1,16 @@
 # DevDiary
 
+## Notable added libraries
+
+Beyond what the Expo Router starter template already included, these are the third-party libraries added over the course of this project (excludes ones tried and later removed — see the relevant entries for those swaps and why):
+
+- **`react-native-calendars`** — the date picker/calendar on the Planner tab (Entry 6, replacing the native `@react-native-community/datetimepicker`, which was removed).
+- **`react-native-element-dropdown`** — the meal-selection dropdown on Planner (Entry 11, replacing `@react-native-picker/picker`, which was removed).
+- **`@react-native-async-storage/async-storage`** — all local persistence: custom meals, planned meals, the last-added-meal marker (Entries 15, 20, 28).
+- **`expo-image-picker`** + **`expo-file-system`** — picking and permanently storing a custom meal's photo, native-only (Entries 15, 18, 19).
+- **`expo-haptics`** — success feedback when a meal gets planned (Entry 30).
+- **`react-native-radio-buttons-group`** — the weight-goal radio buttons on the Profile page (Entry 35).
+
 ## Entry 1 — Base navigation scaffold (Home, Planner, Historie, Profile)
 
 **Date:** 2026-09-18
@@ -637,6 +648,303 @@ Swapped the outer `<View>` in `(tabs)/planner.tsx` for a `<ScrollView>` — nece
 Two style adjustments that go along with a `ScrollView` specifically:
 - `style={styles.scrollView}` (`{ flex: 1 }`) on the `ScrollView` itself — controls the size of the scrollable *viewport*.
 - The existing `container` style (previously applied via `style` on the `View`) moved to `contentContainerStyle` instead, and its `flex: 1` changed to `flexGrow: 1`. This distinction matters: `contentContainerStyle` describes the layout of the *content inside* the scroll area, not the viewport — `flex: 1` there would try to force the content to exactly match the viewport's height (defeating scrolling for genuinely tall content), whereas `flexGrow: 1` lets it fill the available space when content is short, while still being free to grow taller and scroll when content exceeds the screen.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 27 — Added calories (kcal) as a required field, for future Apple Health comparison
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "Yes firs of all since this app will be using apple health and compare calories we should have our meals also keep calories into account. That means that for every meal you will add calories that make sense for that meal. You will also have to update the Meal type to include calories. And the form aswell. Calories becomes a required field. Make sure to look up what metric system apple uses I think it is kcal."
+
+### Confirmed the unit first
+
+Checked Apple's own HealthKit documentation before writing anything (per AGENTS.md — not assuming, even though the user's guess turned out right): `HKQuantityTypeIdentifier.dietaryEnergyConsumed` uses `HKUnit.kilocalorie()` — so **kcal** is correct, and the `Meal.calories` field is documented as such.
+
+### What I built
+
+- **`src/types/meal.ts`** — added `calories: number` (with a comment noting the kcal unit and why, tying it back to the future Apple Health comparison).
+- **`src/data/meals.json`** — added a `calories` field to all 45 seeded meals, with a per-dish estimate that makes sense for that specific meal (e.g. Classic Beef Burger 750, Ratatouille 220, Chicken Noodle Soup 250, Fish and Chips 800) rather than one generic number — done via a small Node script that inserted each value after that meal's `description` line, matched by name, so the rest of the file's existing hand-formatting (compact inline arrays, 2-space indent) stayed untouched rather than getting reformatted by a blind `JSON.stringify` rewrite.
+- **`add-meal.tsx`**:
+  - New `calories` state + `TextInput` (`keyboardType="numeric"`), placed between Beschrijving and Link to match the field order now on `Meal`.
+  - `calories` is automatically part of `RequiredMealField` (`Exclude<keyof Meal, "allergens" | "image">` from Entry 14) purely by adding it to `Meal` — no change needed to that type alias itself, which is exactly the point of deriving it from `keyof Meal` in the first place.
+  - Added a second, more specific check beyond the existing "all required fields non-empty" one: `calories` also has to actually parse to a real, positive number (`Number.isFinite(caloriesValue) && caloriesValue > 0`). This matters because `Meal.calories` is typed `number`, not `string` — the generic non-empty check alone would happily accept typing "abc" into that field, which would silently become `NaN` once stored. `isFormValid` now requires both checks.
+
+### How I verified it
+
+- `tsc --noEmit` — this is itself real verification here too: it failed immediately after adding `calories` to `Meal`, pointing at the exact two places (`add-meal.tsx`'s `requiredFieldValues` and `newMeal` object) that needed updating — and passed clean afterward, which also re-confirms all 45 `meals.json` entries now structurally satisfy `Meal` (same mechanism as Entry 9).
+- Spot-checked the updated JSON directly (`node -e "JSON.parse(...)"`) — valid, all 45 meals have a numeric `calories` field.
+- `npx expo export --platform web` — successful build.
+
+### Not done yet, worth flagging
+
+The meal overview screen (`(tabs)/planner.tsx`, Entry 21) doesn't display `calories` yet — this entry was scoped to the type/data/form only, per what was asked. Showing it in the overview (and eventually using it for the Apple Health comparison this is all leading toward) is a natural next step whenever you're ready for it.
+
+## Entry 28 — "Plan maaltijd" now actually saves, into a date-keyed AsyncStorage entry
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "yes ok good I understand. So once a person plans the meal it should be placed inside a new async storage containing the date in the todatekey structure. go ahead."
+
+This follows a design discussion (not repeated here — see the conversation) that settled on: a `Record<string, Meal>` keyed by `toDateKey()`'s `"YYYY-MM-DD"` string, rather than an array of `{date, meal}` objects, specifically because the Home page (not built yet) will need to check 7 different dates against this data directly — a keyed lookup (`plannedMeals[dateKey]`) fits that better than searching an array each time.
+
+### What I built
+
+- **`src/types/planned-meal.ts`** — `export type PlannedMeals = Record<string, Meal>;`
+- **`src/constants/storage.ts`** — added `PLANNED_MEALS_STORAGE_KEY = "plannedMeals"`, alongside the existing two keys.
+- **`(tabs)/planner.tsx`**:
+  - The "Plan maaltijd" button (inert since Entry 25) now calls `handlePlanMeal`, which reads the existing `plannedMeals` object from AsyncStorage (defaulting to `{}` if nothing's stored yet — same pattern as everywhere else this app touches AsyncStorage), sets `plannedMeals[toDateKey(selectedDate)] = selectedMeal`, and writes the whole object back.
+  - Reused `toDateKey()` (already defined in this file for the calendar) rather than any other date-to-string conversion — keeping every part of this screen agreeing on the exact same date-key format was the whole point of the earlier design discussion.
+  - Assigning directly to the object key deliberately **overwrites** whatever was previously planned for that date, rather than erroring or appending — matches the "one meal per date" model the `Record` shape was chosen for in the first place.
+  - Added `isPlanningMeal` state (same pattern as `add-meal.tsx`'s `isSaving`) to disable the button and show "Bezig met plannen..." while the AsyncStorage write is in flight, preventing a double-tap from doing anything unexpected.
+  - On success, calls the existing `handleReset()` — clearing the date/meal selection and returning to the calendar, ready to plan another day.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 29 — Debug "reset storage" button on the Profile screen
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "so is it possible for me to reset the storage in the expo go app. I still have meals that i made myself but those dont contain callories"
+followed by: "yes just add it there"
+
+### The problem
+
+Custom meals saved to AsyncStorage before Entry 27 added `calories` to the `Meal` type don't have that field — they were written to storage with the old shape, and AsyncStorage doesn't retroactively validate or migrate anything. The bundled `meals.json` gets caught by TypeScript at compile time (Entry 9's `const meals: Meal[] = mealsData.meals` check), but anything already sitting in a device's AsyncStorage from before the type change has no such safety net — it's just whatever JSON string got written at the time.
+
+### What I built
+
+Added a "Wis opgeslagen data (debug)" button to `profile.tsx`, which:
+- Shows a confirmation `Alert` first (since this is destructive and irreversible) with "Annuleren"/"Wissen" (styled as `destructive`) options.
+- On confirm, calls `AsyncStorage.clear()` — wipes all three keys this app uses (`customMeals`, `plannedMeals`, `lastAddedMealName`) — then shows a second `Alert` confirming it's done.
+
+Went with the full clear (over narrowing it to just `customMeals`) since this exact problem — old AsyncStorage data no longer matching a since-changed `Meal` shape — will recur any time the type changes again, and a general-purpose reset is more useful for that than a narrowly-scoped one-off fix.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 30 — Haptic feedback + auto-dismissing "planned" toast
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "let's add a haptic with expo-haptics and a confirmation screen or popup. you can choose. a popup should dissapear by itself after a second or 3. A confirmation screen could be a hastle when planning multiple meals quickly."
+
+### The choice
+
+Went with the popup, per your own reasoning: a full confirmation screen would add friction to planning several meals back-to-back (navigate to a screen, then navigate back, repeated per meal), while a self-dismissing toast confirms the action without interrupting the flow — you can immediately go plan the next day's meal while it's still fading.
+
+### What I built
+
+- Installed `expo-haptics`. Checked the current SDK 57 API first (per AGENTS.md): `Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)`.
+- `handlePlanMeal` now fires that haptic right after the AsyncStorage write succeeds, then sets `showPlannedToast(true)`, then calls the existing `handleReset()`.
+- A `useEffect` watching `showPlannedToast`: whenever it flips to `true`, starts a 3-second `setTimeout` that flips it back to `false`, with the timeout cleared on cleanup. Depending on `[showPlannedToast]` (not `[]`) means if a second meal gets planned while the toast from the first one is still showing, the effect re-runs and restarts the 3-second window from zero — rather than the first timer firing early and cutting off the second toast, or two separate timers racing each other.
+- Restructured the screen's root return: it's now a `<View style={styles.root}>` wrapping both the `<ScrollView>` and a sibling toast `<View>` that only renders while `showPlannedToast` is true — `position: "absolute"`, bottom-centered, with `pointerEvents="none"` so it never blocks taps on whatever's underneath it (the calendar reappears immediately after `handleReset()`, and the toast floats on top of it without intercepting touches).
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build (`expo-haptics`'s `notificationAsync` has a web implementation too, so no platform branching was needed here, unlike the image-picker/file-system work in earlier entries).
+- Ran the file through `prettier` afterward to clean up indentation from wrapping the whole return in a new parent `View` — no logic or styling values changed, purely whitespace.
+
+## Entry 31 — Fix: toast was rendering underneath the tab bar
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "The toast is popping up at the bottom of the screen for some underneath the tabsbar"
+
+### The problem
+
+The toast's `bottom: 32` was measured relative to this screen's own content area, which has no built-in awareness of the tab bar rendered below it by the navigator — so on devices where the tab bar takes up more vertical space than that 32px accounted for, the toast rendered partially or fully hidden behind it.
+
+### The fix
+
+- Added `useSafeAreaInsets()` (from `react-native-safe-area-context`, already a project dependency) to get the device's safe-area bottom inset (accounts for things like the iPhone home indicator).
+- Changed the toast's position to `bottom: 80 + insets.bottom`, passed as an inline style override on top of the base `toast` style (which no longer hardcodes a `bottom` value itself).
+
+Since this app uses `NativeTabs` (native) and a custom `expo-router/ui` `Tabs` (web) — not the standard `@react-navigation/bottom-tabs` component — there's no official hook to read the tab bar's exact rendered height the way `useBottomTabBarHeight()` would provide for that other navigator. `80` is a deliberately generous fixed estimate meant to clear typical tab bar heights rather than a value derived from measuring the actual bar.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+- Could not visually confirm the exact clearance on a real device/simulator in this environment — flagged to the user as worth a quick check, with the `80` easy to adjust if it's off.
+
+## Entry 32 — Home screen: today's focus card + the next 6 days
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "Ok to the home page, for the home page take some design insparation from the wireframe. The page will containt the day today and the next 6 coming dates. The current day will be displayed larger and takes up the top of the screen. It's card/bar will contain today: with date the planned meal the callories of that meal which you may already display. The burned calories and the calorie difference These two will be empty for now because we have not set it up yet. Make sure these use fitting icons. Underneath that there will be a tip on if they should eat more or less. That can also stay static for now. Thn the other cards simply contain the date and the meal if it was set already. otherwise it will say plan meal."
+
+### Refactor first: shared date helpers
+
+Before building Home, extracted `toDateKey`, `getStartOfToday`, and `formatDate` out of `planner.tsx` (where they were private, file-local functions) into a new `src/utils/date.ts`, and updated `planner.tsx` to import them instead of defining its own copies. Necessary because Home needs the *exact same* date-key logic Planner already uses to write `plannedMeals` — if the two screens built their date keys even slightly differently (e.g. one uses local time, one uses UTC), a meal planned on Planner could fail to show up on Home despite being for "the same day," for the same class of bug already covered at length earlier in this project (Entry 6's original `toDateKey`, and the whole `new Date()`/`toISOString()` discussion).
+
+### What I built
+
+**`src/app/(tabs)/index.tsx`** (Home), rewritten from its placeholder:
+
+- `getUpcomingDates()` generates 7 `Date`s — today plus the next 6 — by starting from `getStartOfToday()` and calling `setDate(getDate() + i)` for each offset.
+- Reads `plannedMeals` from AsyncStorage via `useFocusEffect` (same pattern as Planner's own focus effect) so a meal planned on the Planner tab shows up here immediately on switching to Home, no restart needed.
+- **Focus card** (today, larger, top of screen, per your instruction): shows "Vandaag" + the formatted date + the planned meal's name (or "Nog geen maaltijd gepland" if nothing's planned yet), then a row of three icon-labeled stat tiles:
+  - **Geplande inname** (planned intake) — fork-and-knife icon (`fork.knife` / `restaurant`), shows `{calories} kcal` from today's planned meal, since that data already exists (Entry 27/28) — or `"–"` if nothing's planned.
+  - **Live verbranding** (burned calories) — flame icon (`flame.fill` / `local_fire_department`), hardcoded `"–"` — genuinely empty, since there's no Apple Health integration yet, exactly as you specified.
+  - **Verschil** (difference) — target icon (`target` / `track_changes`), also hardcoded `"–"` for the same reason.
+  - Below that, a static tip box (lightbulb icon, placeholder text about staying active) — deliberately static text for now, per your instruction, not derived from any real calorie comparison yet since that data doesn't exist.
+- **The other 6 days**: each rendered as a plain card with the formatted date, and either `"{meal name} · {calories} kcal"` if something's planned for that date, or the italic placeholder text `"Plan maaltijd"` if not — no button/link wiring yet, purely the display behavior you described ("simply contain the date and the meal... otherwise it will say plan meal").
+
+### Design choices vs. the wireframe
+
+Took inspiration rather than pixel-cloning it: the wireframe's three-stat-row/tip/upcoming-list structure is all here, but colors, spacing, and exact card styling are my own — the wireframe is a layout reference, not a spec to match exactly, and nothing in the request asked for an exact visual clone.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+- Ran `prettier` on the new/changed files afterward for consistent formatting.
+
+## Entry 33 — Home: white rectangular cards with subtle shadows
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "The content looks good, but i want you to put everything in cards like rectangular white cards. If possible give them a subtle shadow"
+
+### What changed
+
+In `(tabs)/index.tsx`, defined a shared `cardShadow` style object and applied it to every card-like element (`focusCard`, the three `statTile`s, `tipBox`, and each `dayCard`) instead of each having its own separate background color (previously light grey for `focusCard`/`dayCard`, pale yellow for `tipBox`). All are now plain white.
+
+The shadow itself needs different props per platform — React Native has no single cross-platform "add a shadow" property:
+- iOS reads `shadowColor`/`shadowOffset`/`shadowOpacity`/`shadowRadius`.
+- Android ignores those and reads `elevation` instead.
+- Web (via react-native-web) translates the iOS-style shadow props into a CSS `box-shadow`.
+
+So `cardShadow` sets all of them at once — a small offset, low opacity (0.08), modest blur radius, and `elevation: 2` — rather than picking one mechanism and leaving the other platforms without a shadow at all.
+
+One knock-on change: since every card is now white, the screen's own background needed to become a light grey (`#f5f5f7`) instead of staying white/default — otherwise the white cards would have had no contrast against the page behind them, and would only have been distinguishable by their (subtle, by design) shadow alone.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 34 — Profile page: allergies, weight-goal radio buttons, conditional calorie margin (static UI only)
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "alright now the profile page, so the profile page should have a way to add allergies, weather you woul like loose, gain, or keep yr current weigth. use radio buttons for this pls. It should also have a margen of caleries you would like to loose or gain. This textfield is only. active when you want to lose or gain weight otherwise it's zero. Make the page just static for now it should not contain any logic for now?"
+
+### What I built
+
+Rewrote `profile.tsx` (previously just a title + the debug reset button from Entry 29) into three sections, all local component state — no AsyncStorage, no persistence, matching "just static for now":
+
+- **Allergieën** — four common allergen pills (Gluten, Lactose, Noten, Soja, per the original PlateMate concept doc) that toggle selected/unselected on tap, plus a text input + "+" button to add custom ones, which render as additional (already-selected-looking) pills alongside the common ones.
+- **Doel** — a custom radio-button group (React Native has no built-in radio component) for `"lose" | "maintain" | "gain"` — a circular outline that fills with a solid inner dot when selected, one row per option ("Afvallen" / "Gewicht behouden" / "Aankomen").
+- **Calorie marge** — a numeric `TextInput`, only `editable` when the weight goal isn't `"maintain"`. Selecting "Gewicht behouden" both disables the field (dimmed background) and forces its value back to `"0"`, since a margin only makes sense when actively trying to lose or gain — matching "otherwise it's zero" exactly.
+
+Kept the existing debug "reset storage" button from Entry 29 at the bottom, unchanged.
+
+### Why local `useState` still counts as "no logic"
+
+Making the pills toggle, the radio buttons select, and the margin field conditionally enable/disable all requires *some* component state — there's no way to build an interactive-looking static mockup without it. What's deliberately absent is anything that reaches outside this component: no AsyncStorage read/write, no effect on any other screen, nothing persisted. Closing and reopening this screen resets everything to its defaults — same spirit as `add-meal.tsx`'s form fields before Entry 15 added actual saving.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 35 — Swapped the custom radio buttons for react-native-radio-buttons-group
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "for the radio buttons i would like you to use the following library https://www.npmjs.com/package/react-native-radio-buttons-group"
+
+### A version-drift mistake caught by the type-checker
+
+Fetched the library's README first (per AGENTS.md) to learn its API — but the doc source I got back turned out to describe an older version (2.3.2), which has an `onPress: (radioButtonsArray: RadioButtonProps[]) => void` signature (hands back the whole options array with `selected` flags baked in). I built against that shape first. `npm install` had actually pulled the current version (3.1.0), and `tsc --noEmit` immediately failed with a type mismatch — which is exactly why the type-check step exists in this workflow: it caught the drift between what I'd read and what was actually installed, before it became a runtime bug.
+
+Fixed by reading the **actual installed package's source** (`node_modules/react-native-radio-buttons-group/lib/types.ts`) instead of trusting the fetched docs a second time — ground truth beats a possibly-stale doc mirror. Version 3.1.0's real API: `RadioGroup` is a controlled component — `onPress: (selectedId: string) => void` (just the tapped id, not the whole array), and which item is selected is driven by a separate `selectedId` prop compared against each `RadioButtonProps.id`, not a `selected` flag living inside the `radioButtons` array itself.
+
+### What changed in `profile.tsx`
+
+- Installed `react-native-radio-buttons-group`.
+- Removed the hand-built radio UI (the `radioGroup`/`radioRow`/`radioOuter`/`radioInner`/`radioLabel` styles and their JSX) from Entry 34.
+- `WEIGHT_GOAL_OPTIONS: RadioButtonProps[]` — a plain constant array now, since `selected` isn't tracked per-item anymore.
+- `selectedWeightGoalId` state (defaulting to `"maintain"`) replaces the old `weightGoal` state — same idea, just matching this library's controlled-component shape.
+- `handleSelectWeightGoal(id: string)` — updates `selectedWeightGoalId`, and still forces `calorieMargin` back to `"0"` when `id === "maintain"`, exactly as before.
+- `<RadioGroup radioButtons={WEIGHT_GOAL_OPTIONS} onPress={handleSelectWeightGoal} selectedId={selectedWeightGoalId} layout="column" />` replaces the custom `Pressable`-based rows entirely.
+
+### How I verified it
+
+- `tsc --noEmit` — failed once (against the wrong assumed API), then passed clean after correcting against the installed source.
+- `npx expo export --platform web` — successful build.
+
+## Entry 36 — Fix: radio buttons were centered, plus a libraries index at the top of this diary
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "can you position these radio buttons cleanly to the left. Also on top of the devDiary I want you to note down all the added libraries we use. Only the notable ones ofcourse"
+
+### The radio button fix
+
+Read `react-native-radio-buttons-group`'s own source (`node_modules/.../lib/RadioGroup.tsx` and `RadioButton.tsx`) to find the actual cause rather than guessing: `RadioGroup`'s container hardcodes `alignItems: 'center'`, and each individual `RadioButton` row hardcodes `marginHorizontal: 10`. Together these centered the whole block of options and gave each row a small built-in side indent, rather than a flush-left layout.
+
+Fixed via the props the library exposes for exactly this:
+- `<RadioGroup containerStyle={{ alignItems: "flex-start" }}>` overrides the group's own centering.
+- Each entry in `WEIGHT_GOAL_OPTIONS` now also sets `containerStyle: { marginHorizontal: 0 }`, zeroing out the per-row indent so the options sit flush against the page's own left padding.
+
+### The libraries index
+
+Added a "Notable added libraries" section right after the `# DevDiary` heading, listing the third-party packages added over the project so far (`react-native-calendars`, `react-native-element-dropdown`, `@react-native-async-storage/async-storage`, `expo-image-picker`/`expo-file-system`, `expo-haptics`, `react-native-radio-buttons-group`) with a one-line note on what each is for and a pointer to the entry that added it. Deliberately left out ones that were tried and later removed (`@react-native-community/datetimepicker`, `@react-native-picker/picker`) since "libraries we use" means the current set, not the full history — that history is still fully preserved in the individual entries for anyone who wants it.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+- Ran `prettier` on `profile.tsx` afterward for formatting consistency.
+
+## Entry 37 — Allergies now persist to AsyncStorage
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "ok, so we will need to create a new async.storage key for allergies. That means that toggle allergen and handleAddCustomAllergen will both need to take this into account. When a allergen is added it gets pushed into the async storage. when one get's toggled it should also delete or push it."
+
+### A bug fixed along the way
+
+While rewriting this, found a genuine bug in the existing `toggleAllergen` (visible in a recent edit you'd made): it used a block-body arrow function without a `return` statement —
+```ts
+setSelectedAllergens((prev) => {
+  prev.includes(allergen) ? prev.filter(...) : [...prev, allergen],
+});
+```
+— that ternary's result was never returned, so the updater function actually returned `undefined` on every call, meaning toggling an allergen would have set the state to `undefined` instead of the intended array. This never surfaced yet because nothing had been clicked to trigger it since that edit. The refactor below replaces this function entirely, fixing it as a side effect.
+
+### What changed
+
+- **`src/constants/storage.ts`** — added `ALLERGIES_STORAGE_KEY = "allergies"`.
+- **`profile.tsx`** — collapsed the two separate pieces of state (`selectedAllergens` for the common toggleable tags, `customAllergens` for typed-in ones) into a single `allergies: string[]`. There's no meaningful difference between "a common tag the user turned on" and "a custom one they typed" once both are just allergies the user has — one flat persisted list covers both, same reasoning as `plannedMeals` and `customMeals` each being one array/object rather than several parallel ones.
+  - Loads `allergies` from `ALLERGIES_STORAGE_KEY` via `useFocusEffect` (same pattern as Home/Planner) — reads fresh every time this screen gains focus, not just once on first mount.
+  - `persistAllergies(updated: string[])` — a small shared helper that updates state *and* writes to AsyncStorage in one call, since every mutation needs to do both.
+  - `toggleAllergen(allergen)`: computes the new array (add if absent, remove if present) and passes it to `persistAllergies` — directly answers "should also delete or push it," since toggling now does exactly one or the other depending on current membership.
+  - `handleAddCustomAllergen()`: same shared `persistAllergies`, appending the trimmed input if it's non-empty and not already present.
+  - Rendering: the four common tags check `allergies.includes(allergen)` for their selected state; anything else in `allergies` (i.e. `allergies.filter(a => !COMMON_ALLERGENS.includes(a))`) renders as an additional pill — same visual result as before, just derived from the one persisted list instead of two separate state arrays.
 
 ### How I verified it
 
