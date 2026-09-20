@@ -28,6 +28,7 @@ export default function AddMeal() {
   const [allergens, setAllergens] = useState("");
   const [ingredients, setIngredients] = useState("");
   const [description, setDescription] = useState("");
+  const [calories, setCalories] = useState("");
   const [link, setLink] = useState("");
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -36,12 +37,19 @@ export default function AddMeal() {
     name,
     ingredients,
     description,
+    calories,
     link,
   };
 
-  const isFormValid = Object.values(requiredFieldValues).every(//check that all required fields are non-empty after trimming whitespace
+  const areRequiredFieldsFilled = Object.values(requiredFieldValues).every(//check that all required fields are non-empty after trimming whitespace
     (value) => value.trim() !== "",
   );
+  // calories also needs to actually parse to a real, positive number — Meal.calories
+  // is typed as `number`, so "abc" passing the non-empty check above isn't enough
+  // on its own; Number("abc") would silently become NaN otherwise.
+  const caloriesValue = Number(calories);
+  const isCaloriesValid = Number.isFinite(caloriesValue) && caloriesValue > 0;
+  const isFormValid = areRequiredFieldsFilled && isCaloriesValid;
 
   const handleSubmit = async () => {
     if (!isFormValid || isSaving) {
@@ -55,6 +63,7 @@ export default function AddMeal() {
         allergens: splitCommaList(allergens),
         ingredients: splitCommaList(ingredients),
         description: description.trim(),
+        calories: caloriesValue,
         link: link.trim(),
         image: imagePath ?? PLACEHOLDER_IMAGE,
       };
@@ -114,6 +123,15 @@ export default function AddMeal() {
         multiline
         value={description}
         onChangeText={setDescription}
+      />
+
+      <Text style={styles.label}>Calorieën (kcal)</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Bijv. 650"
+        keyboardType="numeric"
+        value={calories}
+        onChangeText={setCalories}
       />
 
       <Text style={styles.label}>Link</Text>

@@ -642,3 +642,131 @@ Two style adjustments that go along with a `ScrollView` specifically:
 
 - `tsc --noEmit` — clean.
 - `npx expo export --platform web` — successful build.
+
+## Entry 27 — Added calories (kcal) as a required field, for future Apple Health comparison
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "Yes firs of all since this app will be using apple health and compare calories we should have our meals also keep calories into account. That means that for every meal you will add calories that make sense for that meal. You will also have to update the Meal type to include calories. And the form aswell. Calories becomes a required field. Make sure to look up what metric system apple uses I think it is kcal."
+
+### Confirmed the unit first
+
+Checked Apple's own HealthKit documentation before writing anything (per AGENTS.md — not assuming, even though the user's guess turned out right): `HKQuantityTypeIdentifier.dietaryEnergyConsumed` uses `HKUnit.kilocalorie()` — so **kcal** is correct, and the `Meal.calories` field is documented as such.
+
+### What I built
+
+- **`src/types/meal.ts`** — added `calories: number` (with a comment noting the kcal unit and why, tying it back to the future Apple Health comparison).
+- **`src/data/meals.json`** — added a `calories` field to all 45 seeded meals, with a per-dish estimate that makes sense for that specific meal (e.g. Classic Beef Burger 750, Ratatouille 220, Chicken Noodle Soup 250, Fish and Chips 800) rather than one generic number — done via a small Node script that inserted each value after that meal's `description` line, matched by name, so the rest of the file's existing hand-formatting (compact inline arrays, 2-space indent) stayed untouched rather than getting reformatted by a blind `JSON.stringify` rewrite.
+- **`add-meal.tsx`**:
+  - New `calories` state + `TextInput` (`keyboardType="numeric"`), placed between Beschrijving and Link to match the field order now on `Meal`.
+  - `calories` is automatically part of `RequiredMealField` (`Exclude<keyof Meal, "allergens" | "image">` from Entry 14) purely by adding it to `Meal` — no change needed to that type alias itself, which is exactly the point of deriving it from `keyof Meal` in the first place.
+  - Added a second, more specific check beyond the existing "all required fields non-empty" one: `calories` also has to actually parse to a real, positive number (`Number.isFinite(caloriesValue) && caloriesValue > 0`). This matters because `Meal.calories` is typed `number`, not `string` — the generic non-empty check alone would happily accept typing "abc" into that field, which would silently become `NaN` once stored. `isFormValid` now requires both checks.
+
+### How I verified it
+
+- `tsc --noEmit` — this is itself real verification here too: it failed immediately after adding `calories` to `Meal`, pointing at the exact two places (`add-meal.tsx`'s `requiredFieldValues` and `newMeal` object) that needed updating — and passed clean afterward, which also re-confirms all 45 `meals.json` entries now structurally satisfy `Meal` (same mechanism as Entry 9).
+- Spot-checked the updated JSON directly (`node -e "JSON.parse(...)"`) — valid, all 45 meals have a numeric `calories` field.
+- `npx expo export --platform web` — successful build.
+
+### Not done yet, worth flagging
+
+The meal overview screen (`(tabs)/planner.tsx`, Entry 21) doesn't display `calories` yet — this entry was scoped to the type/data/form only, per what was asked. Showing it in the overview (and eventually using it for the Apple Health comparison this is all leading toward) is a natural next step whenever you're ready for it.
+
+## Entry 28 — "Plan maaltijd" now actually saves, into a date-keyed AsyncStorage entry
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "yes ok good I understand. So once a person plans the meal it should be placed inside a new async storage containing the date in the todatekey structure. go ahead."
+
+This follows a design discussion (not repeated here — see the conversation) that settled on: a `Record<string, Meal>` keyed by `toDateKey()`'s `"YYYY-MM-DD"` string, rather than an array of `{date, meal}` objects, specifically because the Home page (not built yet) will need to check 7 different dates against this data directly — a keyed lookup (`plannedMeals[dateKey]`) fits that better than searching an array each time.
+
+### What I built
+
+- **`src/types/planned-meal.ts`** — `export type PlannedMeals = Record<string, Meal>;`
+- **`src/constants/storage.ts`** — added `PLANNED_MEALS_STORAGE_KEY = "plannedMeals"`, alongside the existing two keys.
+- **`(tabs)/planner.tsx`**:
+  - The "Plan maaltijd" button (inert since Entry 25) now calls `handlePlanMeal`, which reads the existing `plannedMeals` object from AsyncStorage (defaulting to `{}` if nothing's stored yet — same pattern as everywhere else this app touches AsyncStorage), sets `plannedMeals[toDateKey(selectedDate)] = selectedMeal`, and writes the whole object back.
+  - Reused `toDateKey()` (already defined in this file for the calendar) rather than any other date-to-string conversion — keeping every part of this screen agreeing on the exact same date-key format was the whole point of the earlier design discussion.
+  - Assigning directly to the object key deliberately **overwrites** whatever was previously planned for that date, rather than erroring or appending — matches the "one meal per date" model the `Record` shape was chosen for in the first place.
+  - Added `isPlanningMeal` state (same pattern as `add-meal.tsx`'s `isSaving`) to disable the button and show "Bezig met plannen..." while the AsyncStorage write is in flight, preventing a double-tap from doing anything unexpected.
+  - On success, calls the existing `handleReset()` — clearing the date/meal selection and returning to the calendar, ready to plan another day.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 29 — Debug "reset storage" button on the Profile screen
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "so is it possible for me to reset the storage in the expo go app. I still have meals that i made myself but those dont contain callories"
+followed by: "yes just add it there"
+
+### The problem
+
+Custom meals saved to AsyncStorage before Entry 27 added `calories` to the `Meal` type don't have that field — they were written to storage with the old shape, and AsyncStorage doesn't retroactively validate or migrate anything. The bundled `meals.json` gets caught by TypeScript at compile time (Entry 9's `const meals: Meal[] = mealsData.meals` check), but anything already sitting in a device's AsyncStorage from before the type change has no such safety net — it's just whatever JSON string got written at the time.
+
+### What I built
+
+Added a "Wis opgeslagen data (debug)" button to `profile.tsx`, which:
+- Shows a confirmation `Alert` first (since this is destructive and irreversible) with "Annuleren"/"Wissen" (styled as `destructive`) options.
+- On confirm, calls `AsyncStorage.clear()` — wipes all three keys this app uses (`customMeals`, `plannedMeals`, `lastAddedMealName`) — then shows a second `Alert` confirming it's done.
+
+Went with the full clear (over narrowing it to just `customMeals`) since this exact problem — old AsyncStorage data no longer matching a since-changed `Meal` shape — will recur any time the type changes again, and a general-purpose reset is more useful for that than a narrowly-scoped one-off fix.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 30 — Haptic feedback + auto-dismissing "planned" toast
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "let's add a haptic with expo-haptics and a confirmation screen or popup. you can choose. a popup should dissapear by itself after a second or 3. A confirmation screen could be a hastle when planning multiple meals quickly."
+
+### The choice
+
+Went with the popup, per your own reasoning: a full confirmation screen would add friction to planning several meals back-to-back (navigate to a screen, then navigate back, repeated per meal), while a self-dismissing toast confirms the action without interrupting the flow — you can immediately go plan the next day's meal while it's still fading.
+
+### What I built
+
+- Installed `expo-haptics`. Checked the current SDK 57 API first (per AGENTS.md): `Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)`.
+- `handlePlanMeal` now fires that haptic right after the AsyncStorage write succeeds, then sets `showPlannedToast(true)`, then calls the existing `handleReset()`.
+- A `useEffect` watching `showPlannedToast`: whenever it flips to `true`, starts a 3-second `setTimeout` that flips it back to `false`, with the timeout cleared on cleanup. Depending on `[showPlannedToast]` (not `[]`) means if a second meal gets planned while the toast from the first one is still showing, the effect re-runs and restarts the 3-second window from zero — rather than the first timer firing early and cutting off the second toast, or two separate timers racing each other.
+- Restructured the screen's root return: it's now a `<View style={styles.root}>` wrapping both the `<ScrollView>` and a sibling toast `<View>` that only renders while `showPlannedToast` is true — `position: "absolute"`, bottom-centered, with `pointerEvents="none"` so it never blocks taps on whatever's underneath it (the calendar reappears immediately after `handleReset()`, and the toast floats on top of it without intercepting touches).
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build (`expo-haptics`'s `notificationAsync` has a web implementation too, so no platform branching was needed here, unlike the image-picker/file-system work in earlier entries).
+- Ran the file through `prettier` afterward to clean up indentation from wrapping the whole return in a new parent `View` — no logic or styling values changed, purely whitespace.
+
+## Entry 31 — Fix: toast was rendering underneath the tab bar
+
+**Date:** 2026-09-20
+
+**Prompt given:**
+> "The toast is popping up at the bottom of the screen for some underneath the tabsbar"
+
+### The problem
+
+The toast's `bottom: 32` was measured relative to this screen's own content area, which has no built-in awareness of the tab bar rendered below it by the navigator — so on devices where the tab bar takes up more vertical space than that 32px accounted for, the toast rendered partially or fully hidden behind it.
+
+### The fix
+
+- Added `useSafeAreaInsets()` (from `react-native-safe-area-context`, already a project dependency) to get the device's safe-area bottom inset (accounts for things like the iPhone home indicator).
+- Changed the toast's position to `bottom: 80 + insets.bottom`, passed as an inline style override on top of the base `toast` style (which no longer hardcodes a `bottom` value itself).
+
+Since this app uses `NativeTabs` (native) and a custom `expo-router/ui` `Tabs` (web) — not the standard `@react-navigation/bottom-tabs` component — there's no official hook to read the tab bar's exact rendered height the way `useBottomTabBarHeight()` would provide for that other navigator. `80` is a deliberately generous fixed estimate meant to clear typical tab bar heights rather than a value derived from measuring the actual bar.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+- Could not visually confirm the exact clearance on a real device/simulator in this environment — flagged to the user as worth a quick check, with the `80` easy to adjust if it's off.
