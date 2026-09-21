@@ -13,7 +13,11 @@ export default function RootLayout() {
             <Link href="/profile" asChild>
               <Pressable hitSlop={8}>
                 <SymbolView
-                  name={{ ios: "person.circle", android: "person", web: "person" }}
+                  name={{
+                    ios: "person.circle",
+                    android: "person",
+                    web: "person",
+                  }}
                   size={22}
                 />
               </Pressable>
@@ -24,14 +28,14 @@ export default function RootLayout() {
       <Stack.Screen
         name="profile"
         options={{
-          title: "Profiel",
+          title: "Profile",
           presentation: "modal",
         }}
       />
       <Stack.Screen
         name="add-meal"
         options={{
-          title: "add meal",
+          title: "Add Meal",
           presentation: "modal",
         }}
       />

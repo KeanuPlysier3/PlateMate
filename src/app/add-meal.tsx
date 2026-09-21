@@ -1,10 +1,20 @@
 import { useState } from "react";
-import { ScrollView, Text, TextInput, StyleSheet, Pressable, Alert } from "react-native";
+import {
+  ScrollView,
+  Text,
+  TextInput,
+  StyleSheet,
+  Pressable,
+  Alert,
+} from "react-native";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import MealImageField from "@/components/meal-image-field";
-import { CUSTOM_MEALS_STORAGE_KEY, LAST_ADDED_MEAL_STORAGE_KEY } from "@/constants/storage";
+import {
+  CUSTOM_MEALS_STORAGE_KEY,
+  LAST_ADDED_MEAL_STORAGE_KEY,
+} from "@/constants/storage";
 import type { Meal } from "@/types/meal";
 
 // Every Meal field is required to fill in the form EXCEPT allergens and image
@@ -20,8 +30,8 @@ const PLACEHOLDER_IMAGE = "images/meal-placeholder.png";
 const splitCommaList = (value: string): string[] =>
   value
     .split(",")
-    .map((item) => item.trim())//no whitespace
-    .filter((item) => item !== "");//remove empty strings
+    .map((item) => item.trim()) //no whitespace
+    .filter((item) => item !== ""); //remove empty strings
 
 export default function AddMeal() {
   const [name, setName] = useState("");
@@ -33,7 +43,8 @@ export default function AddMeal() {
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const requiredFieldValues: Record<RequiredMealField, string> = {// TypeScript type check ensures all required fields are present
+  const requiredFieldValues: Record<RequiredMealField, string> = {
+    // TypeScript type check ensures all required fields are present
     name,
     ingredients,
     description,
@@ -41,7 +52,8 @@ export default function AddMeal() {
     link,
   };
 
-  const areRequiredFieldsFilled = Object.values(requiredFieldValues).every(//check that all required fields are non-empty after trimming whitespace
+  const areRequiredFieldsFilled = Object.values(requiredFieldValues).every(
+    //check that all required fields are non-empty after trimming whitespace
     (value) => value.trim() !== "",
   );
   // calories also needs to actually parse to a real, positive number — Meal.calories
@@ -82,53 +94,54 @@ export default function AddMeal() {
       router.back();
     } catch (error) {
       Alert.alert(
-        "Opslaan mislukt",
-        "Het is niet gelukt om de maaltijd op te slaan. Probeer het opnieuw.",
+        "Saving failed",
+        "Something went wrong while saving the meal. Please try again.",
       );
-    } finally { //even if the save fails, we want to reset the saving state so the user can try again
+    } finally {
+      //even if the save fails, we want to reset the saving state so the user can try again
       setIsSaving(false);
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.label}>Naam</Text>
+      <Text style={styles.label}>Name</Text>
       <TextInput
         style={styles.input}
-        placeholder="Bijv. Spaghetti Carbonara"
+        placeholder="E.g. Spaghetti Carbonara"
         value={name}
         onChangeText={setName}
       />
 
-      <Text style={styles.label}>Allergenen</Text>
+      <Text style={styles.label}>Allergens</Text>
       <TextInput
         style={styles.input}
-        placeholder="Komma-gescheiden, bijv. gluten, dairy, egg"
+        placeholder="Comma-separated, e.g. gluten, dairy, egg"
         value={allergens}
         onChangeText={setAllergens}
       />
 
-      <Text style={styles.label}>Ingrediënten</Text>
+      <Text style={styles.label}>Ingredients</Text>
       <TextInput
         style={styles.input}
-        placeholder="Komma-gescheiden, bijv. pasta, eieren, kaas"
+        placeholder="Comma-separated, e.g. pasta, eggs, cheese"
         value={ingredients}
         onChangeText={setIngredients}
       />
 
-      <Text style={styles.label}>Beschrijving</Text>
+      <Text style={styles.label}>Description</Text>
       <TextInput
         style={[styles.input, styles.multilineInput]}
-        placeholder="Korte omschrijving van het gerecht"
+        placeholder="Short description of the dish"
         multiline
         value={description}
         onChangeText={setDescription}
       />
 
-      <Text style={styles.label}>Calorieën (kcal)</Text>
+      <Text style={styles.label}>Calories (kcal)</Text>
       <TextInput
         style={styles.input}
-        placeholder="Bijv. 650"
+        placeholder="E.g. 650"
         keyboardType="numeric"
         value={calories}
         onChangeText={setCalories}
@@ -142,16 +155,19 @@ export default function AddMeal() {
         onChangeText={setLink}
       />
 
-      <Text style={styles.label}>Afbeelding</Text>
+      <Text style={styles.label}>Photo</Text>
       <MealImageField onImagePathChange={setImagePath} />
 
       <Pressable
-        style={[styles.submitButton, !isFormValid && styles.submitButtonDisabled]}
+        style={[
+          styles.submitButton,
+          !isFormValid && styles.submitButtonDisabled,
+        ]}
         disabled={!isFormValid || isSaving}
         onPress={handleSubmit}
       >
         <Text style={styles.submitButtonText}>
-          {isSaving ? "Bezig met opslaan..." : "Toevoegen"}
+          {isSaving ? "Saving..." : "Add"}
         </Text>
       </Pressable>
     </ScrollView>

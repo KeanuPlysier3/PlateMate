@@ -15,7 +15,7 @@ const getUpcomingDates = (): Date[] => {
   const dates: Date[] = [];
   for (let i = 0; i < UPCOMING_DAYS_COUNT; i++) {
     const date = new Date(start);
-    date.setDate(date.getDate() + i);//we set the date by looking at the current date of date and addiing i to.
+    date.setDate(date.getDate() + i); //we set the date by looking at the current date of date and addiing i to.
     dates.push(date);
   }
   return dates;
@@ -56,10 +56,10 @@ export default function Home() {
       contentContainerStyle={styles.container}
     >
       <View style={styles.focusCard}>
-        <Text style={styles.focusLabel}>Vandaag</Text>
+        <Text style={styles.focusLabel}>Today</Text>
         <Text style={styles.focusDate}>{formatDate(today)}</Text>
         <Text style={styles.focusMealName}>
-          {todayMeal ? todayMeal.name : "Nog geen maaltijd gepland"}
+          {todayMeal ? todayMeal.name : "No meal planned yet"}
         </Text>
 
         <View style={styles.statsRow}>
@@ -76,7 +76,7 @@ export default function Home() {
             <Text style={styles.statValue}>
               {todayMeal ? `${todayMeal.calories} kcal` : "–"}
             </Text>
-            <Text style={styles.statLabel}>Geplande inname</Text>
+            <Text style={styles.statLabel}>Planned intake</Text>
           </View>
 
           <View style={styles.statTile}>
@@ -91,7 +91,7 @@ export default function Home() {
             />
             {/* Empty until Apple Health integration exists */}
             <Text style={styles.statValue}>–</Text>
-            <Text style={styles.statLabel}>Live verbranding</Text>
+            <Text style={styles.statLabel}>Live burn</Text>
           </View>
 
           <View style={styles.statTile}>
@@ -106,7 +106,7 @@ export default function Home() {
             />
             {/* Empty until Apple Health integration exists */}
             <Text style={styles.statValue}>–</Text>
-            <Text style={styles.statLabel}>Verschil</Text>
+            <Text style={styles.statLabel}>Difference</Text>
           </View>
         </View>
 
@@ -121,13 +121,12 @@ export default function Home() {
             tintColor="#8a6d00"
           />
           <Text style={styles.tipText}>
-            Probeer vandaag iets actiever te zijn om je calorieën in balans te
-            houden.
+            Try to be a bit more active today to keep your calories balanced.
           </Text>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>coming days</Text>
+      <Text style={styles.sectionTitle}>Upcoming days</Text>
 
       {upcomingDays.map((date) => {
         const meal = plannedMeals[toDateKey(date)];
@@ -139,7 +138,7 @@ export default function Home() {
                 {meal.name} · {meal.calories} kcal
               </Text>
             ) : (
-              <Text style={styles.dayCardMealEmpty}>Plan maaltijd</Text>
+              <Text style={styles.dayCardMealEmpty}>Plan meal</Text>
             )}
           </View>
         );

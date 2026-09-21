@@ -14,8 +14,8 @@ type MealImageFieldProps = {
 export default function MealImageField(_props: MealImageFieldProps) {
   return (
     <Text style={styles.webImageNotice}>
-      Een eigen foto toevoegen kan alleen in de mobiele app. Op web wordt
-      automatisch een standaardafbeelding gebruikt.
+      Adding your own photo is only possible in the mobile app. On web, a
+      default image is used automatically.
     </Text>
   );
 }

@@ -20,3 +20,13 @@ export const PLANNED_MEALS_STORAGE_KEY = "plannedMeals";
 // one flat list (see profile.tsx). Written whenever an allergen is toggled
 // or added; nothing else reads it yet.
 export const ALLERGIES_STORAGE_KEY = "allergies";
+
+// A single string — one of "lose" | "maintain" | "gain" — set by the weight
+// goal radio buttons on Profile.
+export const WEIGHT_GOAL_STORAGE_KEY = "weightGoal";
+
+// A single string holding the daily calorie margin (kcal/day) as digits
+// only — no sign, no leading zero (see profile.tsx's input sanitizing).
+// Only meaningful when WEIGHT_GOAL_STORAGE_KEY isn't "maintain"; forced back
+// to "0" whenever it is.
+export const CALORIE_MARGIN_STORAGE_KEY = "calorieMargin";

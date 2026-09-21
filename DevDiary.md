@@ -950,3 +950,169 @@ setSelectedAllergens((prev) => {
 
 - `tsc --noEmit` — clean.
 - `npx expo export --platform web` — successful build.
+
+## Entry 38 — Allergy checker when a meal is selected in Planner
+
+**Date:** 2026-09-21
+
+**Prompt given:**
+> "So next thing we are implementing is an allergy checker in when planning a meal. So if a person selects a meal that contains an allergy that is set up on the profile there will be a warning explaining that the meal contains an allergy of the person."
+
+### A vocabulary mismatch caught before writing any matching logic
+
+Checked what allergen strings `meals.json` actually uses before assuming anything: `dairy, egg, fish, gluten, peanuts, sesame, shellfish, soy` — English, lowercase. Profile's common allergen tags (Entry 34) were Dutch labels stored verbatim: `"Gluten", "Lactose", "Noten", "Soja"`. A naive case-insensitive string match would only ever catch `"Gluten"` (coincidentally the same word in both languages) — `"Lactose"` vs `"dairy"`, `"Noten"` vs `"peanuts"`, and `"Soja"` vs `"soy"` are different words entirely and would never match, silently failing to warn for 3 of the 4 preset tags. Verified this concretely with a quick Node script against the real data before and after the fix (see below).
+
+### What I built
+
+- **`src/constants/allergens.ts`** (new) — `COMMON_ALLERGENS: { id: string; label: string }[]`, giving each common tag a canonical English `id` matching the meal vocabulary (`gluten`, `dairy`, `peanuts`, `soy`) separate from its Dutch `label`. Also exports:
+  - `getAllergenLabel(id)` — known common ids map back to their Dutch label for display; anything else (a custom-typed allergen, or an English meal tag with no Dutch preset like `egg`/`fish`/`sesame`/`shellfish`) just gets capitalized.
+  - `findMatchingAllergens(mealAllergens, userAllergies)` — case-insensitive intersection, returning the meal's own allergen strings that the user is allergic to.
+- **`profile.tsx`** — now imports `COMMON_ALLERGENS` from this shared file instead of a local Dutch-only string array. `toggleAllergen`/rendering now operate on `.id` (persisted, matched) while displaying `.label` (Dutch, shown to the user) — the `allergies` array in AsyncStorage now stores `"dairy"` instead of `"Lactose"`, etc.
+- **`(tabs)/planner.tsx`**:
+  - Loads `userAllergies` from `ALLERGIES_STORAGE_KEY` — folded into the existing focus-effect that already reads `customMeals`/`lastAddedMealName`, rather than adding a second separate effect.
+  - `matchedAllergens = selectedMeal ? findMatchingAllergens(selectedMeal.allergens, userAllergies) : []`, computed once per render before the JSX (not an inline IIFE — kept the render logic itself as a straightforward conditional).
+  - When non-empty, renders a warning box in the meal overview (warning-triangle icon, "Waarschuwing: dit recept bevat `<labels>` — dit komt overeen met een allergie in je profiel.") — same visual treatment (pale yellow, icon + text) as Home's static tip box from Entry 32/33, for visual consistency between the two "informational callout" patterns already in the app.
+
+### Note on scope
+
+A pre-existing allergy already stored under the *old* format (the Dutch label, e.g. `"Lactose"`) from before this fix wouldn't match correctly — same class of stale-data issue as Entry 29's calorie field, and covered by the same fix: the debug "reset storage" button on Profile.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+- Ran the actual `findMatchingAllergens` logic against real `meals.json` data via a one-off Node script: confirmed the old Dutch-label approach would have missed Carbonara's `dairy` tag entirely, and the fixed id-based approach catches it correctly.
+
+## Entry 39 — Translated the entire app to English
+
+**Date:** 2026-09-21
+
+**Prompt given:**
+> "The entire application should be in english"
+
+### What I did
+
+Searched systematically across `src/app`, `src/components`, and `src/constants` for Dutch text (grepped for common Dutch words/patterns, then double-checked with a second pass for Dutch diacritics like `ë`/`ï` and function words like `het`/`een`/`van`/`voor`/`met`/`de`/`wordt`, to catch anything the first pass missed) rather than translating file-by-file from memory. Translated every screen:
+
+- **`_layout.tsx`** — modal titles "Profiel"/"add meal" → "Profile"/"Add Meal".
+- **`(tabs)/history.tsx`** — "Historie" → "History".
+- **`(tabs)/index.tsx`** (Home) — "Vandaag" → "Today", "Nog geen maaltijd gepland" → "No meal planned yet", the three stat labels ("Geplande inname"/"Live verbranding"/"Verschil" → "Planned intake"/"Live burn"/"Difference"), the tip text, "coming days" → "Upcoming days" (was already English but lowercase/informal), "Plan maaltijd" → "Plan meal".
+- **`(tabs)/planner.tsx`** — the allergy warning text, "Ingrediënten"/"Allergenen" → "Ingredients"/"Allergens", "Geen bekende allergenen" → "No known allergens", "Bezig met plannen..." → "Planning...", the plan-button label, dropdown placeholder, the "of" divider → "or", "+ Nieuw Recept" → "+ New Recipe", "Bevestigen" → "Confirm", the toast "Maaltijd gepland!" → "Meal planned!".
+- **`add-meal.tsx`** — every field label and placeholder, the save-failed `Alert`, "Bezig met opslaan..."/"Toevoegen" → "Saving..."/"Add".
+- **`profile.tsx`** — "Profiel"/"Allergieën"/"Doel" section headers, the weight-goal radio labels ("Afvallen"/"Gewicht behouden"/"Aankomen" → "Lose weight"/"Maintain current weight"/"Gain weight"), the reset-storage confirmation `Alert` (title, message, and both button labels), the calorie-margin label/placeholder, the debug button label.
+- **`components/meal-image-field.tsx`** (web) and **`.native.tsx`** — the "mobile-only" notice and the picker button's two label states.
+- **`constants/allergens.ts`** — the four common allergens' display `label`s (`"Lactose"/"Noten"/"Soja"` → `"Dairy"/"Peanuts"/"Soy"`; `"Gluten"` was already the same word in both languages). Their canonical `id`s (`gluten`/`dairy`/`peanuts`/`soy`, from Entry 38) were already English and untouched — this was a display-only change, nothing persisted in AsyncStorage needed migrating.
+
+### What I deliberately left alone
+
+Code comments and internal variable/function names — the request was about the *application* (what a user sees), not the source code's own documentation. `meals.json`'s 45 seeded meals were already written in English from the start (Entry 8), so no changes were needed there.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+- Ran `prettier` across every touched file afterward for formatting consistency.
+
+## Entry 40 — Simplified allergens.ts now that id and label are both English
+
+**Date:** 2026-09-21
+
+**Prompt given:**
+> "that is no longer the case as the entire application is back to english." (correcting my explanation, which described the original Dutch/English reason for the id/label split)
+followed by: "yes you may update that part to simplify"
+
+### What changed
+
+Since Entry 39 translated Profile's allergen labels to English, `COMMON_ALLERGENS`'s `id` (`"dairy"`) and `label` (`"Dairy"`) had become the same word in two letter-casings — the original reason for tracking them as two separate fields (bridging Dutch display text to English matching keys) no longer applied.
+
+- **`src/constants/allergens.ts`** — `COMMON_ALLERGENS` is now a plain `string[]` (`["gluten", "dairy", "peanuts", "soy"]`) instead of `{ id, label }[]`. `getAllergenLabel` dropped its `Map` lookup entirely and is now a single unconditional capitalize — it already had this exact fallback behavior for non-common allergens, so removing the special-cased common-tag branch didn't change what it returns for any input, only simplified how it gets there.
+- **`profile.tsx`** — updated to match: `allergies.includes(allergen)` instead of `.includes(allergen.id)`, `toggleAllergen(allergen)` instead of `.id`, and displays `getAllergenLabel(allergen)` instead of `allergen.label`. The custom-tags filter simplified from `!COMMON_ALLERGENS.some((c) => c.id === allergen)` back to a plain `!COMMON_ALLERGENS.includes(allergen)`.
+
+No data migration involved — the actual persisted `id` strings (`gluten`/`dairy`/`peanuts`/`soy`) are unchanged; only how their display text gets derived changed, from a lookup table to a plain capitalize.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+
+## Entry 41 — Custom allergies can now be removed via a cross
+
+**Date:** 2026-09-21
+
+**Prompt given:**
+> "Ok custom allergies should also feature a cross to remove them again"
+
+### What I built
+
+In `profile.tsx`:
+- `handleRemoveCustomAllergen(allergen)` — filters that allergen out of `allergies` and passes the result to the existing `persistAllergies` helper (same update-state-and-write-to-AsyncStorage helper already used by `toggleAllergen`/`handleAddCustomAllergen`).
+- The custom-allergy pills (the second `.map()`, rendering anything in `allergies` that isn't one of the four `COMMON_ALLERGENS`) now include a small `Pressable` with a `SymbolView` "xmark" icon (`xmark`/`close` — an SF Symbol, not a text "×" character, per the standing no-emoji/no-raw-glyph rule for icons) next to the label, calling `handleRemoveCustomAllergen` for that specific tag.
+- Added `customTag` style (`flexDirection: "row"`, small gap) so the label and cross sit side-by-side within the pill instead of stacking.
+
+The four common tags are unaffected — those stay toggleable on/off via tapping the pill itself (Entry 37), not removable, since they're a fixed preset list, not user-created entries. Only genuinely custom-typed allergies get the remove affordance, which is the only case where "delete this specific one" actually makes sense.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+- Ran `prettier` on the file afterward for formatting.
+
+## Entry 42 — Weight goal and calorie margin now persist too, with input sanitizing
+
+**Date:** 2026-09-21
+
+**Prompt given:**
+> "Alright let's now store all the other profile settings in async storage, for the callorie margin make sure no negitave numbers or numberst starting with 0."
+
+### What I built
+
+- **`src/constants/storage.ts`** — added `WEIGHT_GOAL_STORAGE_KEY` (`"weightGoal"`) and `CALORIE_MARGIN_STORAGE_KEY` (`"calorieMargin"`), alongside the existing `ALLERGIES_STORAGE_KEY`.
+- **`profile.tsx`**'s focus effect now also reads both new keys (defaulting to `"maintain"` and `"0"` respectively if nothing's stored yet), so returning to this screen — or reopening the app — restores the previously chosen weight goal and margin, not just allergies.
+- **`handleSelectWeightGoal`** now writes the selected id straight to `WEIGHT_GOAL_STORAGE_KEY` alongside updating state; when the goal is `"maintain"`, it also writes `"0"` to `CALORIE_MARGIN_STORAGE_KEY` (matching the existing forced-reset-to-zero behavior from Entry 34, now also persisted rather than just held in memory).
+- **`handleChangeCalorieMargin`** (new, replacing the old direct `setCalorieMargin` wiring) sanitizes on every keystroke: `text.replace(/[^0-9]/g, "").replace(/^0+/, "")` — strips anything that isn't a digit (which also removes any `-` a user might type, so negative numbers are impossible rather than merely rejected after the fact) and strips leading zeros (`"0500"` → `"500"`). Verified this against a handful of edge cases (`"0500"` → `"500"`, `"-500"` → `"500"`, `"0"`/`"00"` → `""`, `"5-00"` → `"500"`) with a quick Node script before wiring it in.
+
+### Why sanitize-as-you-type instead of validate-on-submit
+
+This screen has no submit action at all — every field persists immediately as it changes (that's the whole point of Entry 37/38's pattern). There's no "submit" moment to validate against, so the only place enforcement can happen is at the point of input itself: correcting the string on every keystroke keeps what's stored and what's displayed always in sync and always valid, rather than allowing an invalid value to exist even briefly.
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+- Ran the sanitize function against edge cases via a one-off Node script before wiring it into the component.
+
+## Entry 43 — Apple Health connection status on Profile (in-app changes only)
+
+**Date:** 2026-09-21
+
+**Prompt given:**
+> "yes we will do it this way, you will have to guide me towards the steps. But first the inApp changes"
+(following an earlier report-only discussion — see the previous conversation — covering `@kingstinct/react-native-healthkit`'s Expo Go incompatibility, the New Architecture requirement, and Apple's privacy-driven inability to expose true grant/deny status for *read* permissions)
+
+### New Architecture check
+
+Confirmed before doing anything: as of Expo SDK 55+, the New Architecture is mandatory and can't be disabled — this project (SDK 57) already satisfies that requirement with zero config needed, so nothing to change there.
+
+### What I built
+
+- Installed `@kingstinct/react-native-healthkit` + its `react-native-nitro-modules` peer dependency. `expo install` auto-added the bare config plugin entry to `app.json`; configured it explicitly rather than leaving it default:
+  ```json
+  ["@kingstinct/react-native-healthkit", {
+    "NSHealthShareUsageDescription": "PlateMate reads your burned calories from Apple Health to compare them against your planned meals.",
+    "NSHealthUpdateUsageDescription": false,
+    "background": false
+  }]
+  ```
+  `NSHealthUpdateUsageDescription: false` and `background: false` opt out of the write-permission prompt and the background-delivery entitlement — neither is needed since this only ever *reads* burned-calorie data, and keeping the entitlement footprint minimal is better than requesting capabilities the app doesn't use.
+- **Found a better mechanism than originally planned** for the "has this been requested" status: rather than my earlier plan of tracking a local AsyncStorage flag ourselves, I read the library's actual installed source (`useHealthkitAuthorization.ts`, `types/Auth.ts`) rather than trusting only the fetched docs, and found it exposes `useHealthkitAuthorization({ toRead })` → `[status, request]`, backed by Apple's real `HKAuthorizationRequestStatus` (`unknown` / `shouldRequest` / `unnecessary`). This is a genuine native signal — the OS itself tracks "has this app already asked for these types" — so it's strictly better than a self-maintained flag that could drift out of sync with reality.
+- **`src/components/health-connection-status.ios.tsx`** — the real component. Checks `isHealthDataAvailable()` first (HealthKit doesn't exist on iPad); otherwise uses `useHealthkitAuthorization({ toRead: [ActiveEnergyBurned, BasalEnergyBurned] })` (verified these exact identifier strings against the library's generated C++ type definitions, not guessed). `status === AuthorizationRequestStatus.unnecessary` → shows "Access requested" (never "Connected" — per the earlier discussion, that would be a claim this app genuinely cannot verify for read-only permissions). Otherwise shows "Tap to connect" and calls `requestAuthorization()` on tap, with an `isRequesting` guard against double-taps.
+- **`src/components/health-connection-status.tsx`** — the non-iOS fallback ("Apple Health is only available on iOS"), same platform-split convention as `MealImageField` (Entry 19) — Metro picks `.ios.tsx` on iOS and falls through to the plain `.tsx` on Android/web.
+- **`profile.tsx`** — added an "Apple Health" section at the bottom, rendering `<HealthConnectionStatus />`, matching the wireframe's placement of the Apple Health status block.
+- **Incidental fix**: noticed `expo-image-picker`'s `photosPermission` string in `app.json` was still in Dutch (`"Laat PlateMate een foto kiezen voor je recept."`) — missed during Entry 39's translation sweep since that only searched `src/`, not `app.json`. Fixed to English; it's a genuinely user-facing string (shown in the OS permission dialog).
+
+### How I verified it
+
+- `tsc --noEmit` — clean.
+- `npx expo export --platform web` — successful build.
+- Grepped the exported web bundle for `kingstinct`/`react-native-nitro-modules`/`HKQuantityTypeIdentifier` — 0 matches, confirming the `.ios.tsx` file and its native dependency are genuinely excluded from the web build, not just unused at runtime (same verification style as Entry 19).
+- Could not test actual HealthKit behavior (permission prompt, `AuthorizationRequestStatus` values) in this environment — no iOS build tooling or device available here. That's the next step, to be done on your actual iPhone per the guided native-build process discussed separately.

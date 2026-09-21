@@ -7,7 +7,9 @@ type MealImageFieldProps = {
   onImagePathChange: (path: string | null) => void;
 };
 
-export default function MealImageField({ onImagePathChange }: MealImageFieldProps) {
+export default function MealImageField({
+  onImagePathChange,
+}: MealImageFieldProps) {
   const [previewUri, setPreviewUri] = useState<string | null>(null);
 
   const handlePickImage = async () => {
@@ -26,10 +28,10 @@ export default function MealImageField({ onImagePathChange }: MealImageFieldProp
     // guaranteed to stick around, so copy it into the app's own persistent
     // storage (Paths.document) right away — this is the file the Meal.image
     // path will actually point to.
-    const mealsDir = new Directory(Paths.document, "meals");//paths.document is the app's persistent storage directory, "meals" is a subdirectory for meal images
-    mealsDir.create({ idempotent: true });//idempotent: true means that if the directory already exists, it won't throw an error
+    const mealsDir = new Directory(Paths.document, "meals"); //paths.document is the app's persistent storage directory, "meals" is a subdirectory for meal images
+    mealsDir.create({ idempotent: true }); //idempotent: true means that if the directory already exists, it won't throw an error
 
-    const fileName = `${Date.now()}.jpg`;//unique filename
+    const fileName = `${Date.now()}.jpg`; //unique filename
 
     const destination = new File(mealsDir, fileName);
     // Create a File object representing the new file location
@@ -43,10 +45,8 @@ export default function MealImageField({ onImagePathChange }: MealImageFieldProp
     //delete any previously selected image file from the meals directory, if there was one, to avoid cluttering the app's storage with unused images. This is a best-effort cleanup; if the old file is already gone for some reason, there's nothing left to do.
     if (previewUri) {
       try {
-        new File(previewUri).delete();//refers to the location of the previously selected image file in the meals directory, and deletes it
-      } catch {
-
-      }
+        new File(previewUri).delete(); //refers to the location of the previously selected image file in the meals directory, and deletes it
+      } catch {}
     }
 
     setPreviewUri(destination.uri);
@@ -60,7 +60,7 @@ export default function MealImageField({ onImagePathChange }: MealImageFieldProp
       )}
       <Pressable style={styles.imagePickerButton} onPress={handlePickImage}>
         <Text style={styles.imagePickerButtonText}>
-          {previewUri ? "Andere afbeelding kiezen" : "Selecteer afbeelding"}
+          {previewUri ? "Choose a different photo" : "Select photo"}
         </Text>
       </Pressable>
     </>
