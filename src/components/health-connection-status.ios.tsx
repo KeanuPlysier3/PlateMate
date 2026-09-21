@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SymbolView } from "expo-symbols";
 import {
   AuthorizationRequestStatus,
@@ -8,17 +8,17 @@ import {
 } from "@kingstinct/react-native-healthkit";
 
 // Only burned-calorie data is needed — active + resting (basal) energy —
-// matching Home's "Live burn" stat tile (Entry 32/33), which is still a
-// static placeholder until this data actually gets read somewhere.
+
 const READ_TYPES = [
   "HKQuantityTypeIdentifierActiveEnergyBurned",
   "HKQuantityTypeIdentifierBasalEnergyBurned",
 ] as const;
 
 export default function HealthConnectionStatus() {
-  const [status, requestAuthorization] = useHealthkitAuthorization({
+  const [status, requestAuthorization] = useHealthkitAuthorization({ //destructure the return value of useHealthkitAuthorization to get status and requestAuthorization
     toRead: READ_TYPES,
   });
+
   const [isRequesting, setIsRequesting] = useState(false);
 
   if (!isHealthDataAvailable()) {
@@ -30,20 +30,25 @@ export default function HealthConnectionStatus() {
   }
 
   // Apple's HealthKit deliberately never reveals whether a *read* permission
-  // was actually granted or denied — a privacy design in HealthKit itself,
-  // not a limitation of this library. AuthorizationRequestStatus only ever
-  // tells us whether the system considers this "already requested," not the
-  // outcome, so "unnecessary" (meaning: already asked) is shown as "Access
-  // requested," never as a potentially-false "Connected."
-  const hasBeenRequested = status === AuthorizationRequestStatus.unnecessary;
+  // has been granted or denied, so we can't show a "connected" state.
+  const hasBeenRequested = status === AuthorizationRequestStatus.unnecessary;//if the status is unnecessary, the user already requested,so we can consider it as "has been requested"
 
   const handlePress = async () => {
-    if (hasBeenRequested || isRequesting) {
+    if (isRequesting) {
       return;
     }
+
+    if (hasBeenRequested) {
+      Alert.alert(
+        "Manage Health Access",
+        'Open the Health app, tap your profile picture (top right), then "Apps", then "PlateMate" to change what data it can read.',
+      );
+      return;
+    }
+
     setIsRequesting(true);
     try {
-      await requestAuthorization();
+      await requestAuthorization();//request access to the specified health data types.
     } finally {
       setIsRequesting(false);
     }
@@ -53,18 +58,18 @@ export default function HealthConnectionStatus() {
     <Pressable
       style={styles.row}
       onPress={handlePress}
-      disabled={hasBeenRequested || isRequesting}
+      disabled={isRequesting}
     >
       <SymbolView
         name={{ ios: "heart.fill", android: "favorite", web: "favorite" }}
         size={22}
-        tintColor={hasBeenRequested ? "#2e7d32" : "#888"}
+        tintColor={hasBeenRequested ? "#44bc4a" : "#888"}
       />
       <View style={styles.textColumn}>
         <Text style={styles.statusTitle}>Apple Health</Text>
         <Text style={styles.statusSubtitle}>
           {hasBeenRequested
-            ? "Access requested"
+            ? "Access requested,tap for how to manage"
             : isRequesting
               ? "Requesting..."
               : "Tap to connect"}
