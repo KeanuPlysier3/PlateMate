@@ -24,7 +24,7 @@ export default function HealthConnectionStatus() {
   if (!isHealthDataAvailable()) {
     return (
       <Text style={styles.unavailableText}>
-        Apple Health isn't available on this device.
+        Apple Health isn't available on this dvice.
       </Text>
     );
   }

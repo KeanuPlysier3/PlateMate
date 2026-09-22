@@ -1116,3 +1116,50 @@ Confirmed before doing anything: as of Expo SDK 55+, the New Architecture is man
 - `npx expo export --platform web` — successful build.
 - Grepped the exported web bundle for `kingstinct`/`react-native-nitro-modules`/`HKQuantityTypeIdentifier` — 0 matches, confirming the `.ios.tsx` file and its native dependency are genuinely excluded from the web build, not just unused at runtime (same verification style as Entry 19).
 - Could not test actual HealthKit behavior (permission prompt, `AuthorizationRequestStatus` values) in this environment — no iOS build tooling or device available here. That's the next step, to be done on your actual iPhone per the guided native-build process discussed separately.
+
+## Entry 44 — Let PlateMate re-request Health access, and fixed it after moving to a new Wi-Fi
+
+**Date:** 2026-09-22
+
+**Prompt given:**
+> "well yes i gues you could do it that way" (re-request via Health app instructions instead of a broken Settings deep link) and separately: "my mac and iphone are on a new wifi" → "the application is just stuck on splash screen" → "no script url provided make sure the packager is running..."
+
+### The problem, in plain terms
+
+Two separate issues came up back to back:
+
+1. **Apple Health "connect" button couldn't be tapped again.** Once you'd already been asked for Health permission once, Apple's rules say the app is never allowed to show that popup a second time — that's true no matter what code we write, it's an iOS restriction. The only place a user can change their mind afterwards is inside the Health app itself, not inside PlateMate.
+2. **The app stopped loading after switching Wi-Fi networks.** PlateMate's code lives on your Mac and gets sent to your phone live over the network (that's how you see changes instantly without rebuilding). The new Wi-Fi network (looked like a school network) blocks devices from talking directly to each other for security, even though both can reach the internet — so your phone could no longer "hear" your Mac. It also turned out the app was missing a piece (`expo-dev-client`) that would have let it recover from this itself by asking for a new address; without it, the app was stuck only ever looking for your Mac's old, no-longer-reachable address.
+
+### What I built
+
+- **`health-connection-status.ios.tsx`**: tapping the row after Health access has already been requested now shows a popup with plain instructions ("Open the Health app, tap your profile picture, then Apps, then PlateMate") instead of silently doing nothing.
+- **Installed `expo-dev-client`**: gives the installed app a proper "can't find the server, let me try a different address" screen, instead of getting permanently stuck on whatever address it was built with.
+- **Installed `@expo/ngrok`**: needed so the Mac can offer the phone a connection that travels over the internet instead of the local network, side-stepping the network's device-isolation restriction.
+- Rebuilt and reinstalled the app on your phone once (required because `expo-dev-client` is a native addition, not just a JS change) — after that, day-to-day work goes back to just editing code and it reloading live, same as before.
+
+### How I verified it
+
+- Watched the Metro/tunnel logs directly to confirm the phone genuinely wasn't reaching the Mac over plain Wi-Fi (no connection attempt logged at all).
+- Confirmed the tunnel came up (`Tunnel connected` / `Tunnel ready` in the logs) and got its public address from ngrok's local status API.
+- Rebuilt via `npx expo run:ios --device`, confirmed "Build Succeeded, 0 errors" and 100% install completion in the build log before considering it done.
+
+## Entry 45 — Home screen's "Live burn" tile now shows real burned calories
+
+**Date:** 2026-09-22
+
+**Prompt given:**
+> "alright go ahead, I want you to place the function that captures the value in a new file inside the utils directory tho, simply import the function inside the index file because it is getting a bit crowded."
+(following on from discussing `queryStatisticsForQuantity` and wanting active + resting energy combined into one numeral)
+
+### What I built
+
+- **`src/utils/health.ios.ts`** — new file, exports `getTodayBurnedCalories()`. Calls `queryStatisticsForQuantity` twice (once for `HKQuantityTypeIdentifierActiveEnergyBurned`, once for `HKQuantityTypeIdentifierBasalEnergyBurned`) with a `cumulativeSum` statistic and a `filter.date` range from the start of today to now, then adds the two `sumQuantity.quantity` values together. Returns `null` (not `0`) when a sum is missing, so the UI can tell "no data yet" apart from "genuinely zero calories burned."
+- **`src/utils/health.ts`** — the non-iOS fallback, same platform-split pattern as `health-connection-status`: just resolves to `null`, since HealthKit doesn't exist on Android/web.
+- **`src/app/(tabs)/index.tsx`** — added a second `useFocusEffect` (kept separate from the existing `plannedMeals` one rather than merged, since they're unrelated data sources with unrelated failure modes) that calls `getTodayBurnedCalories()` and stores it in a new `burnedCalories` state. The "Live burn" stat tile now shows `${Math.round(burnedCalories)} kcal` instead of the `–` placeholder that had been sitting there since Entry 43, falling back to `–` only when the value is `null`.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (aside from pre-existing, unrelated errors in `example/`, which isn't part of the app).
+- Hit one real type error from guessing the query options shape wrong (`{ from, to }` isn't a real field on `StatisticsQueryOptions`) — read the library's actual `.d.ts` files (`QuantityType.d.ts`, `QueryOptions.d.ts` in both `@kingstinct/react-native-healthkit` and `@react-native-healthkit/core`) rather than guessing again, and found the real shape is `{ filter: { date: { startDate, endDate } } }`.
+- `npx expo export --platform web`, then grepped the output for `kingstinct`/`HKQuantityTypeIdentifier` — 0 matches, confirming `health.ios.ts` and its native import stay out of the web bundle, same check as Entry 43.

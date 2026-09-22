@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { PLANNED_MEALS_STORAGE_KEY } from "@/constants/storage";
 import { getStartOfToday, toDateKey, formatDate } from "@/utils/date";
+import { getTodayBurnedCalories } from "@/utils/health";
 import type { PlannedMeals } from "@/types/planned-meal";
 
 const UPCOMING_DAYS_COUNT = 7; // today + the next 6
@@ -23,6 +24,7 @@ const getUpcomingDates = (): Date[] => {
 
 export default function Home() {
   const [plannedMeals, setPlannedMeals] = useState<PlannedMeals>({});
+  const [burnedCalories, setBurnedCalories] = useState<number | null>(null);
 
   // Re-reads on every focus (not just on mount) so a meal planned on the
   // Planner tab shows up here as soon as you switch back to Home — same
@@ -38,6 +40,25 @@ export default function Home() {
         const parsed: PlannedMeals = storedValue ? JSON.parse(storedValue) : {};
         if (isActive) {
           setPlannedMeals(parsed);
+        }
+      })();
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
+
+
+  // burned-calorie total changes constantly while the app is in the
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      (async () => {
+        const total = await getTodayBurnedCalories();
+        if (isActive) {
+          setBurnedCalories(total);
         }
       })();
 
@@ -89,8 +110,9 @@ export default function Home() {
               size={22}
               tintColor="#1c1c1e"
             />
-            {/* Empty until Apple Health integration exists */}
-            <Text style={styles.statValue}>–</Text>
+            <Text style={styles.statValue}>
+              {burnedCalories !== null ? `${Math.round(burnedCalories)} kcal` : "–"}
+            </Text>
             <Text style={styles.statLabel}>Live burn</Text>
           </View>
 
