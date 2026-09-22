@@ -6,6 +6,7 @@ export async function getBurnedCaloriesForDate(date: Date): Promise<number | nul
   const startOfDay = getStartOfDay(date);
   const startOfNextDay = new Date(startOfDay);//copy the startOfDay so we can modify it by adding 1 day
   startOfNextDay.setDate(startOfNextDay.getDate() + 1);//set the date to midnight of the next day
+  const now = new Date();
   const endDate = startOfNextDay < now ? startOfNextDay : now; // never query into the future
 
   const filter = { date: { startDate: startOfDay, endDate } };
