@@ -7,7 +7,7 @@ import {
   Image,
   ScrollView,
 } from "react-native";
-import { Link, useFocusEffect } from "expo-router";
+import { Link, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Calendar, type DateData } from "react-native-calendars";
 import { Dropdown } from "react-native-element-dropdown";
@@ -23,6 +23,7 @@ import {
   PLANNED_MEALS_STORAGE_KEY,
 } from "@/constants/storage";
 import { findMatchingAllergens, getAllergenLabel } from "@/constants/allergens";
+import { COLORS } from "@/constants/theme";
 import { resolveMealImage } from "@/utils/resolve-meal-image";
 import { toDateKey, getStartOfToday, formatDate } from "@/utils/date";
 import type { Meal } from "@/types/meal";
@@ -33,7 +34,7 @@ import type { PlannedMeals } from "@/types/planned-meal";
 // at compile time — a structurally invalid meal fails the build, not runtime.
 const bundledMeals: Meal[] = mealsData.meals;
 
-const ACCENT_COLOR = "#007AFF";
+const ACCENT_COLOR = COLORS.orange;
 
 export default function Planner() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -44,6 +45,20 @@ export default function Planner() {
   const [showPlannedToast, setShowPlannedToast] = useState(false);
   const [userAllergies, setUserAllergies] = useState<string[]>([]);
   const insets = useSafeAreaInsets();
+  const { date } = useLocalSearchParams<{ date?: string }>();
+
+  // Set only when arriving via a day card's "+" button on Home (see its
+  // Link to `/planner?date=...`). Jumps straight past the calendar into
+  // meal-picking for that date, then clears the param so it doesn't keep
+  // re-forcing this date on a later, ordinary visit to the Planner tab.
+  useFocusEffect(
+    useCallback(() => {
+      if (date) {
+        setSelectedDate(new Date(date));
+        router.setParams({ date: undefined });
+      }
+    }, [date]),
+  );
 
   // Auto-dismiss the "planned" toast after 3 seconds. Re-runs whenever
   // showPlannedToast changes, so planning a second meal while the first
@@ -168,7 +183,7 @@ export default function Planner() {
                     web: "arrow_back",
                   }}
                   size={26}
-                  tintColor="black"
+                  tintColor={COLORS.teal}
                 />
               </Pressable>
 
@@ -245,7 +260,7 @@ export default function Planner() {
                     web: "arrow_back",
                   }}
                   size={26}
-                  tintColor="black"
+                  tintColor={COLORS.teal}
                 />
               </Pressable>
               <Text style={styles.selectedDate}>
@@ -329,7 +344,7 @@ const styles = StyleSheet.create({
   toast: {
     position: "absolute",
     alignSelf: "center",
-    backgroundColor: "#1c1c1e",
+    backgroundColor: COLORS.teal,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -362,6 +377,7 @@ const styles = StyleSheet.create({
   selectedDate: {
     fontSize: 28,
     fontWeight: "700",
+    color: COLORS.teal,
   },
   dropdown: {
     width: "100%",
@@ -390,6 +406,7 @@ const styles = StyleSheet.create({
   mealName: {
     fontSize: 22,
     fontWeight: "700",
+    color: COLORS.teal,
   },
   mealDescription: {
     fontSize: 15,
@@ -423,7 +440,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: "#1c1c1e",
+    backgroundColor: COLORS.orange,
     alignItems: "center",
   },
   planMealButtonDisabled: {
@@ -456,18 +473,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#1c1c1e",
+    borderColor: COLORS.teal,
     alignItems: "center",
   },
   addMealButtonText: {
     fontSize: 16,
     fontWeight: "600",
+    color: COLORS.teal,
   },
   confirmButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    backgroundColor: "#1c1c1e",
+    backgroundColor: COLORS.orange,
   },
   confirmButtonText: {
     color: "#fff",

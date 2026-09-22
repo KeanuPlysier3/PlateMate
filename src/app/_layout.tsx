@@ -2,9 +2,16 @@ import { Link, Stack } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Pressable } from "react-native";
 
+import { COLORS } from "@/constants/theme";
+
+const headerOptions = {
+  headerStyle: { backgroundColor: COLORS.teal },
+  headerTintColor: COLORS.white,
+} as const;
+
 export default function RootLayout() {
   return (
-    <Stack>
+    <Stack screenOptions={headerOptions}>
       <Stack.Screen
         name="(tabs)"
         options={{
@@ -19,6 +26,7 @@ export default function RootLayout() {
                     web: "person",
                   }}
                   size={22}
+                  tintColor={COLORS.white}
                 />
               </Pressable>
             </Link>

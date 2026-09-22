@@ -16,6 +16,15 @@ export const getStartOfToday = (): Date => {
   return today;
 };
 
+// Same "midnight" logic as getStartOfToday, but for any date — used wherever
+// a whole calendar day's range is needed, not just today's (e.g. History's
+// per-day HealthKit queries).
+export const getStartOfDay = (date: Date): Date => {
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+  return startOfDay;
+};
+
 // For human-facing display (contrast with toDateKey, which is for the code
 // to compare dates reliably, not for people to read).
 export const formatDate = (date: Date): string =>

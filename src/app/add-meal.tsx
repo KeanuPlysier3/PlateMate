@@ -15,6 +15,7 @@ import {
   CUSTOM_MEALS_STORAGE_KEY,
   LAST_ADDED_MEAL_STORAGE_KEY,
 } from "@/constants/storage";
+import { COLORS } from "@/constants/theme";
 import type { Meal } from "@/types/meal";
 
 // Every Meal field is required to fill in the form EXCEPT allergens and image
@@ -183,6 +184,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginTop: 12,
+    color: COLORS.teal,
   },
   input: {
     borderWidth: 1,
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: "#1c1c1e",
+    backgroundColor: COLORS.orange,
     alignItems: "center",
   },
   submitButtonDisabled: {

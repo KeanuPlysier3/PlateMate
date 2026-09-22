@@ -1163,3 +1163,82 @@ Two separate issues came up back to back:
 - `tsc --noEmit` — clean (aside from pre-existing, unrelated errors in `example/`, which isn't part of the app).
 - Hit one real type error from guessing the query options shape wrong (`{ from, to }` isn't a real field on `StatisticsQueryOptions`) — read the library's actual `.d.ts` files (`QuantityType.d.ts`, `QueryOptions.d.ts` in both `@kingstinct/react-native-healthkit` and `@react-native-healthkit/core`) rather than guessing again, and found the real shape is `{ filter: { date: { startDate, endDate } } }`.
 - `npx expo export --platform web`, then grepped the output for `kingstinct`/`HKQuantityTypeIdentifier` — 0 matches, confirming `health.ios.ts` and its native import stay out of the web bundle, same check as Entry 43.
+
+## Entry 46 — Applied the style guide's colors across the app (layout unchanged)
+
+**Date:** 2026-09-22
+
+**Prompt given:**
+> "Good we now have the base of the project. I say it's time to Make it look a little better. The current UI is fine, but I want you to have a look at the wireframe directory and look at the styleExample image. You use this image as yr guide for style. The wireFrame was used for UI and layout this image is for style that includes colors and other visual aspects. To be clear you are not to change the layout of our application you simply adjust colors etc to fit the proposed style better."
+
+### What I built
+
+- **`src/constants/theme.ts`** — new file, one `COLORS` object read off `wireframe/StyleExample.jpg`: a dark teal (`#1B4D46`, headers/hero surfaces in the reference image), a lighter teal (`#2E6D63`), a coral-orange (`#E2703A`, used for the reference's "VIEW" buttons and highlights), a warm cream page background (`#F5F1E6`), plus white/text tokens. One shared file rather than repeating hex codes per screen, so the palette stays consistent and adjustable in one place.
+- Swapped colors only, no layout/structure changes, across:
+  - `_layout.tsx` — Stack header background now teal with white title/back text, matching the reference's dark header bar.
+  - `app-tabs.native.tsx` / `app-tabs.tsx` — bottom tab bar tint set to orange (active tab) on a white bar, web fallback's top border tinted teal.
+  - `(tabs)/index.tsx` — page background cream, "Today" label + section titles + date in teal, stat tile icons split teal/orange (orange specifically on the new Live Burn tile to make it stand out), cards stay white.
+  - `(tabs)/planner.tsx` — replaced the leftover blue `ACCENT_COLOR` (`#007AFF`, never matched anything) with orange; primary buttons (Plan meal, Confirm) now orange, the secondary "+ New Recipe" outline button and headings now teal.
+  - `add-meal.tsx` — form labels teal, submit button orange.
+  - `profile.tsx` — title/section labels teal, selected allergy tags teal (previously near-black).
+  - `(tabs)/history.tsx` — cream background, teal heading, for consistency even though this screen is still just a placeholder.
+- Left a few colors alone on purpose: the allergy-warning banner's amber tone (semantic "caution" color, not brand styling) and the destructive "Clear stored data" button's red — changing either could blur their meaning.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (aside from the same pre-existing `example/` errors as Entry 45, unrelated to this change).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+
+## Entry 47 — Home screen's tip is now based on the user's actual goal, not a hardcoded sentence
+
+**Date:** 2026-09-22
+
+**Prompt given:**
+> "Now generate correct tips based on the user's goal their weight goal Their desired difference and their current differnce."
+(the "Difference" stat tile and its calculation had been hand-edited on disk since Entry 45/46 — `Math.abs(Math.round(burnedCalories) - todayMeal.calories)` — which is where I picked this up from)
+
+### What I built
+
+- **Fixed a crash I found while wiring this up**: the hand-edited Difference tile read `todayMeal.calories` directly, which throws on any day with no planned meal (`todayMeal` is `undefined` then — this is exactly the situation the app is in most of the time before you've planned anything). Replaced with `plannedIntake = todayMeal?.calories ?? 0`.
+- **`src/utils/calorie-tips.ts`** — new file, exports `getCalorieTip(weightGoal, calorieMargin, burnedCalories, plannedIntake)`. Defines "current difference" as burned − planned intake (positive = deficit, negative = surplus) and compares it against the user's target margin, with the target's meaning flipped depending on goal:
+  - `lose`: wants current difference ≥ margin (a big enough deficit) — tip says how many more kcal of deficit are needed, or congratulates if already there.
+  - `gain`: wants current difference ≤ −margin (a big enough surplus) — same idea, mirrored.
+  - `maintain`: margin is always 0 (enforced already in profile.tsx); tip just flags whether today is within ±100 kcal of balanced, and which direction it's off by if not.
+- **`(tabs)/index.tsx`** — added a `useFocusEffect` reading `WEIGHT_GOAL_STORAGE_KEY`/`CALORIE_MARGIN_STORAGE_KEY` (same keys `profile.tsx` writes), computed `currentDifference` once and reused it for both the Difference tile and the tip text, and replaced the hardcoded tip sentence with `getCalorieTip(...)`. Falls back to a "connect Apple Health" prompt when `burnedCalories` hasn't loaded yet, rather than showing a tip computed against a fake zero.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as Entry 45/46).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+
+## Entry 48 — Guaranteed calorie tips never show a negative number
+
+**Date:** 2026-09-22
+
+**Prompt given:**
+> "no negative numbers within tips"
+
+### What I built
+
+- **`src/utils/calorie-tips.ts`** — the "lose" and "gain" branches' `remaining` values were already guarded against going negative by the early-return checks above them (`remaining <= 0` / `remaining >= 0`), so no negative number could reach the rounded output mathematically. Wrapped both anyway in `Math.max(0, ...)` as an explicit, unconditional guarantee rather than relying on that reasoning holding forever — cheap insurance against a floating-point edge case (e.g. HealthKit's `burnedCalories` landing exactly on a boundary) ever slipping a negative through.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+
+## Entry 49 — Home's upcoming-day cards can jump straight into planning that date
+
+**Date:** 2026-09-22
+
+**Prompt given:**
+> "the upcoming dates need a button that links to the planning page and set's them to the correct date" → clarified to: don't make the whole card pressable (card itself is reserved for a future meal-detail page), instead "add a + button on the right of the card to plan in the meal" → "the button is a square that has the same border radius as the cards, its orange and contains the plus button."
+
+### What I built
+
+- **`(tabs)/index.tsx`** — each upcoming-day row is now a `dayCardRow` containing the existing (still non-pressable) `dayCard` plus a new square `dayCardAddButton` (52×52, `borderRadius: 12` matching the card, orange background, white `+` icon). Wrapped in a `Link` to `{ pathname: "/planner", params: { date: toDateKey(date) } }` — Expo Router's typed object form for a query param, rather than hand-building a URL string.
+- **`(tabs)/planner.tsx`** — reads that param with `useLocalSearchParams<{ date?: string }>()`. A `useFocusEffect` checks it on every focus: if present, calls `setSelectedDate(new Date(date))` to skip straight past the calendar into meal-picking for that day, then immediately clears it with `router.setParams({ date: undefined })`. The clear matters because Planner is a tab screen that never unmounts — without clearing it, the param would stay attached to the screen's route and silently re-force that same date the next time the user opened the Planner tab normally (e.g. from the tab bar, with no day-card tap involved), which would have been a confusing, seemingly random bug days later. Opening Planner any other way, `date` is simply `undefined` and the existing calendar-first behavior is completely untouched.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.

@@ -21,6 +21,7 @@ import {
   WEIGHT_GOAL_STORAGE_KEY,
 } from "@/constants/storage";
 import { COMMON_ALLERGENS, getAllergenLabel } from "@/constants/allergens";
+import { COLORS } from "@/constants/theme";
 import HealthConnectionStatus from "@/components/health-connection-status";
 
 // containerStyle overrides the library's default marginHorizontal: 10 on
@@ -255,12 +256,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "600",
     marginBottom: 8,
+    color: COLORS.teal,
   },
   sectionLabel: {
     fontSize: 14,
     fontWeight: "600",
     marginTop: 20,
     marginBottom: 4,
+    color: COLORS.teal,
   },
   radioGroupContainer: {
     alignItems: "flex-start",
@@ -278,13 +281,13 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
   },
   tagSelected: {
-    backgroundColor: "#1c1c1e",
-    borderColor: "#1c1c1e",
+    backgroundColor: COLORS.teal,
+    borderColor: COLORS.teal,
   },
   tagText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1c1c1e",
+    color: COLORS.teal,
   },
   tagTextSelected: {
     color: "#fff",
@@ -312,13 +315,14 @@ const styles = StyleSheet.create({
     width: 44,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#1c1c1e",
+    borderColor: COLORS.teal,
     alignItems: "center",
     justifyContent: "center",
   },
   addAllergenButtonText: {
     fontSize: 20,
     fontWeight: "600",
+    color: COLORS.teal,
   },
   input: {
     borderWidth: 1,

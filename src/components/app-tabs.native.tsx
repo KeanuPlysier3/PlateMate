@@ -1,8 +1,10 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 
+import { COLORS } from "@/constants/theme";
+
 export default function AppTabs() {
   return (
-    <NativeTabs>
+    <NativeTabs tintColor={COLORS.orange} backgroundColor={COLORS.white}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="house.fill" md="home" />
