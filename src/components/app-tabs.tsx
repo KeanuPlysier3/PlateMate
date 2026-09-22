@@ -1,6 +1,8 @@
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
 import { Text, StyleSheet } from "react-native";
 
+import { COLORS } from "@/constants/theme";
+
 export default function AppTabs() {
   return (
     <Tabs style={styles.tabs}>
@@ -32,8 +34,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 24,
     paddingVertical: 12,
+    backgroundColor: COLORS.white,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#ccc",
+    borderTopColor: COLORS.tealLight,
   },
   tabTrigger: {
     paddingVertical: 8,

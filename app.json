@@ -8,7 +8,8 @@
     "scheme": "platemate",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.keanuplysier.platemate"
     },
     "android": {
       "adaptiveIcon": {
@@ -36,7 +37,15 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Laat PlateMate een foto kiezen voor je recept."
+          "photosPermission": "Let PlateMate choose a photo for your recipe."
+        }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "PlateMate reads your burned calories from Apple Health to compare them against your planned meals.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
         }
       ]
     ],

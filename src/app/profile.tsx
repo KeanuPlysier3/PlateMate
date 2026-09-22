@@ -9,14 +9,20 @@ import {
   StyleSheet,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import RadioGroup, {
   type RadioButtonProps,
 } from "react-native-radio-buttons-group";
 
-import { ALLERGIES_STORAGE_KEY } from "@/constants/storage";
-
-const COMMON_ALLERGENS = ["Gluten", "Lactose", "Noten", "Soja"];
+import {
+  ALLERGIES_STORAGE_KEY,
+  CALORIE_MARGIN_STORAGE_KEY,
+  WEIGHT_GOAL_STORAGE_KEY,
+} from "@/constants/storage";
+import { COMMON_ALLERGENS, getAllergenLabel } from "@/constants/allergens";
+import { COLORS } from "@/constants/theme";
+import HealthConnectionStatus from "@/components/health-connection-status";
 
 // containerStyle overrides the library's default marginHorizontal: 10 on
 // each row, so the whole group sits flush against the left edge instead of
@@ -24,19 +30,19 @@ const COMMON_ALLERGENS = ["Gluten", "Lactose", "Noten", "Soja"];
 const WEIGHT_GOAL_OPTIONS: RadioButtonProps[] = [
   {
     id: "lose",
-    label: "Afvallen",
+    label: "Lose weight",
     value: "lose",
     containerStyle: { marginHorizontal: 0 },
   },
   {
     id: "maintain",
-    label: "Gewicht behouden",
+    label: "Maintain current weight",
     value: "maintain",
     containerStyle: { marginHorizontal: 0 },
   },
   {
     id: "gain",
-    label: "Aankomen",
+    label: "Gain weight",
     value: "gain",
     containerStyle: { marginHorizontal: 0 },
   },
@@ -57,11 +63,22 @@ export default function Profile() {
       let isActive = true;
 
       (async () => {
-        const storedValue = await AsyncStorage.getItem(ALLERGIES_STORAGE_KEY);
-        const parsed: string[] = storedValue ? JSON.parse(storedValue) : [];
-        if (isActive) {
-          setAllergies(parsed);
+        const storedAllergies = await AsyncStorage.getItem(
+          ALLERGIES_STORAGE_KEY,
+        );
+        const storedWeightGoal = await AsyncStorage.getItem(
+          WEIGHT_GOAL_STORAGE_KEY,
+        );
+        const storedCalorieMargin = await AsyncStorage.getItem(
+          CALORIE_MARGIN_STORAGE_KEY,
+        );
+
+        if (!isActive) {
+          return;
         }
+        setAllergies(storedAllergies ? JSON.parse(storedAllergies) : []);
+        setSelectedWeightGoalId(storedWeightGoal ?? "maintain");
+        setCalorieMargin(storedCalorieMargin ?? "0");
       })();
 
       return () => {
@@ -90,33 +107,46 @@ export default function Profile() {
     setCustomAllergen("");
   };
 
+  const handleRemoveCustomAllergen = (allergen: string) => {
+    persistAllergies(allergies.filter((item) => item !== allergen));
+  };
+
   // react-native-radio-buttons-group's onPress hands back just the tapped
   // id (RadioGroup is a controlled component — the selected item is driven
   // by the separate `selectedId` prop, not baked into radioButtons itself).
   const handleSelectWeightGoal = (id: string) => {
     setSelectedWeightGoalId(id);
+    AsyncStorage.setItem(WEIGHT_GOAL_STORAGE_KEY, id);
+
     // Selecting "keep current weight" forces the margin back to 0 and locks
     // the field — a margin only means something when you're actively trying
     // to lose or gain, per the request.
     if (id === "maintain") {
       setCalorieMargin("0");
+      AsyncStorage.setItem(CALORIE_MARGIN_STORAGE_KEY, "0");
     }
   };
 
   const isMarginActive = selectedWeightGoalId !== "maintain";
 
+  const handleChangeCalorieMargin = (text: string) => {
+    const sanitized = text.replace(/[^0-9]/g, "").replace(/^0+/, ""); //remove any non-digit characters and leading zeros
+    setCalorieMargin(sanitized);
+    AsyncStorage.setItem(CALORIE_MARGIN_STORAGE_KEY, sanitized);
+  };
+
   const handleResetStorage = () => {
     Alert.alert(
-      "Opslag wissen",
-      "Weet je zeker dat je alle lokaal opgeslagen data (eigen recepten, geplande maaltijden) wilt wissen? Dit kan niet ongedaan worden gemaakt.",
+      "Clear storage",
+      "Are you sure you want to clear all locally stored data (your own recipes, planned meals)? This cannot be undone.",
       [
-        { text: "Annuleren", style: "cancel" },
+        { text: "Cancel", style: "cancel" },
         {
-          text: "Wissen",
+          text: "Clear",
           style: "destructive",
           onPress: async () => {
             await AsyncStorage.clear();
-            Alert.alert("Klaar", "Alle lokaal opgeslagen data is gewist.");
+            Alert.alert("Done", "All locally stored data has been cleared.");
           },
         },
       ],
@@ -125,9 +155,9 @@ export default function Profile() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Profiel</Text>
+      <Text style={styles.title}>Profile</Text>
 
-      <Text style={styles.sectionLabel}>Allergieën</Text>
+      <Text style={styles.sectionLabel}>Allergies</Text>
       <View style={styles.tagRow}>
         {COMMON_ALLERGENS.map((allergen) => {
           const isSelected = allergies.includes(allergen);
@@ -140,25 +170,38 @@ export default function Profile() {
               <Text
                 style={[styles.tagText, isSelected && styles.tagTextSelected]}
               >
-                {allergen}
+                {getAllergenLabel(allergen)}
               </Text>
             </Pressable>
           );
         })}
         {allergies
-          .filter((allergen) => !COMMON_ALLERGENS.includes(allergen))
+          .filter((allergen) => !COMMON_ALLERGENS.includes(allergen)) //filter out any custom allergens that are already in the common list, so we don't duplicate them
           .map((allergen) => (
-            <View key={allergen} style={[styles.tag, styles.tagSelected]}>
+            <View
+              key={allergen}
+              style={[styles.tag, styles.tagSelected, styles.customTag]}
+            >
               <Text style={[styles.tagText, styles.tagTextSelected]}>
                 {allergen}
               </Text>
+              <Pressable
+                onPress={() => handleRemoveCustomAllergen(allergen)}
+                hitSlop={8}
+              >
+                <SymbolView
+                  name={{ ios: "xmark", android: "close", web: "close" }}
+                  size={14}
+                  tintColor="#fff"
+                />
+              </Pressable>
             </View>
           ))}
       </View>
       <View style={styles.addAllergenRow}>
         <TextInput
           style={styles.addAllergenInput}
-          placeholder="Andere allergie toevoegen"
+          placeholder="Add another allergy"
           value={customAllergen}
           onChangeText={setCustomAllergen}
           onSubmitEditing={handleAddCustomAllergen}
@@ -171,7 +214,7 @@ export default function Profile() {
         </Pressable>
       </View>
 
-      <Text style={styles.sectionLabel}>Doel</Text>
+      <Text style={styles.sectionLabel}>Goal</Text>
       <RadioGroup
         radioButtons={WEIGHT_GOAL_OPTIONS}
         onPress={handleSelectWeightGoal}
@@ -180,22 +223,25 @@ export default function Profile() {
         containerStyle={styles.radioGroupContainer}
       />
 
-      <Text style={styles.sectionLabel}>Calorie marge (kcal per dag)</Text>
+      <Text style={styles.sectionLabel}>Calorie margin (kcal per day)</Text>
       <TextInput
         style={[styles.input, !isMarginActive && styles.inputDisabled]}
-        placeholder="Bijv. 500"
+        placeholder="E.g. 500"
         keyboardType="numeric"
         value={calorieMargin}
-        onChangeText={setCalorieMargin}
+        onChangeText={handleChangeCalorieMargin}
         editable={isMarginActive}
       />
+
+      <Text style={styles.sectionLabel}>Apple Health</Text>
+      <HealthConnectionStatus />
 
       {/* Debug tool: wipes AsyncStorage entirely (customMeals, plannedMeals,
           lastAddedMealName). Useful whenever the Meal shape changes and
           previously-saved data no longer matches it (e.g. missing calories
           on meals saved before that field existed). */}
       <Pressable style={styles.resetButton} onPress={handleResetStorage}>
-        <Text style={styles.resetButtonText}>Wis opgeslagen data (debug)</Text>
+        <Text style={styles.resetButtonText}>Clear stored data (debug)</Text>
       </Pressable>
     </ScrollView>
   );
@@ -210,12 +256,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "600",
     marginBottom: 8,
+    color: COLORS.teal,
   },
   sectionLabel: {
     fontSize: 14,
     fontWeight: "600",
     marginTop: 20,
     marginBottom: 4,
+    color: COLORS.teal,
   },
   radioGroupContainer: {
     alignItems: "flex-start",
@@ -233,16 +281,21 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
   },
   tagSelected: {
-    backgroundColor: "#1c1c1e",
-    borderColor: "#1c1c1e",
+    backgroundColor: COLORS.teal,
+    borderColor: COLORS.teal,
   },
   tagText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1c1c1e",
+    color: COLORS.teal,
   },
   tagTextSelected: {
     color: "#fff",
+  },
+  customTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   addAllergenRow: {
     flexDirection: "row",
@@ -262,13 +315,14 @@ const styles = StyleSheet.create({
     width: 44,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#1c1c1e",
+    borderColor: COLORS.teal,
     alignItems: "center",
     justifyContent: "center",
   },
   addAllergenButtonText: {
     fontSize: 20,
     fontWeight: "600",
+    color: COLORS.teal,
   },
   input: {
     borderWidth: 1,

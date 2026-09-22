@@ -7,7 +7,7 @@ import {
   Image,
   ScrollView,
 } from "react-native";
-import { Link, useFocusEffect } from "expo-router";
+import { Link, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Calendar, type DateData } from "react-native-calendars";
 import { Dropdown } from "react-native-element-dropdown";
@@ -17,10 +17,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import mealsData from "@/data/meals.json";
 import {
+  ALLERGIES_STORAGE_KEY,
   CUSTOM_MEALS_STORAGE_KEY,
   LAST_ADDED_MEAL_STORAGE_KEY,
   PLANNED_MEALS_STORAGE_KEY,
 } from "@/constants/storage";
+import { findMatchingAllergens, getAllergenLabel } from "@/constants/allergens";
+import { COLORS } from "@/constants/theme";
 import { resolveMealImage } from "@/utils/resolve-meal-image";
 import { toDateKey, getStartOfToday, formatDate } from "@/utils/date";
 import type { Meal } from "@/types/meal";
@@ -31,7 +34,7 @@ import type { PlannedMeals } from "@/types/planned-meal";
 // at compile time — a structurally invalid meal fails the build, not runtime.
 const bundledMeals: Meal[] = mealsData.meals;
 
-const ACCENT_COLOR = "#007AFF";
+const ACCENT_COLOR = COLORS.orange;
 
 export default function Planner() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -40,7 +43,22 @@ export default function Planner() {
   const [meals, setMeals] = useState<Meal[]>(bundledMeals); //initialize meals state with bundledMeals
   const [isPlanningMeal, setIsPlanningMeal] = useState(false);
   const [showPlannedToast, setShowPlannedToast] = useState(false);
+  const [userAllergies, setUserAllergies] = useState<string[]>([]);
   const insets = useSafeAreaInsets();
+  const { date } = useLocalSearchParams<{ date?: string }>();
+
+  // Set only when arriving via a day card's "+" button on Home (see its
+  // Link to `/planner?date=...`). Jumps straight past the calendar into
+  // meal-picking for that date, then clears the param so it doesn't keep
+  // re-forcing this date on a later, ordinary visit to the Planner tab.
+  useFocusEffect(
+    useCallback(() => {
+      if (date) {
+        setSelectedDate(new Date(date));
+        router.setParams({ date: undefined });
+      }
+    }, [date]),
+  );
 
   // Auto-dismiss the "planned" toast after 3 seconds. Re-runs whenever
   // showPlannedToast changes, so planning a second meal while the first
@@ -50,7 +68,7 @@ export default function Planner() {
     if (!showPlannedToast) {
       return;
     }
-    const timeoutId = setTimeout(() => setShowPlannedToast(false), 3000);//dismiss after 3 seconds
+    const timeoutId = setTimeout(() => setShowPlannedToast(false), 3000); //dismiss after 3 seconds
     return () => clearTimeout(timeoutId);
   }, [showPlannedToast]);
 
@@ -86,6 +104,13 @@ export default function Planner() {
             setSelectedMeal(justAddedMeal);
           }
           await AsyncStorage.removeItem(LAST_ADDED_MEAL_STORAGE_KEY);
+        }
+
+        const storedAllergies = await AsyncStorage.getItem(
+          ALLERGIES_STORAGE_KEY,
+        );
+        if (isActive) {
+          setUserAllergies(storedAllergies ? JSON.parse(storedAllergies) : []);
         }
       })();
 
@@ -130,6 +155,10 @@ export default function Planner() {
     }
   };
 
+  const matchedAllergens = selectedMeal
+    ? findMatchingAllergens(selectedMeal.allergens, userAllergies)
+    : [];
+
   return (
     <View style={styles.root}>
       <ScrollView
@@ -154,7 +183,7 @@ export default function Planner() {
                     web: "arrow_back",
                   }}
                   size={26}
-                  tintColor="black"
+                  tintColor={COLORS.teal}
                 />
               </Pressable>
 
@@ -168,16 +197,37 @@ export default function Planner() {
                   {selectedMeal.description}
                 </Text>
 
-                <Text style={styles.mealSectionLabel}>Ingrediënten</Text>
+                {matchedAllergens.length > 0 && (
+                  <View style={styles.allergyWarning}>
+                    <SymbolView
+                      name={{
+                        ios: "exclamationmark.triangle.fill",
+                        android: "warning",
+                        web: "warning",
+                      }}
+                      size={20}
+                      tintColor="#b8860b"
+                    />
+                    <Text style={styles.allergyWarningText}>
+                      Warning: this recipe contains{" "}
+                      {matchedAllergens
+                        .map((allergen) => getAllergenLabel(allergen))
+                        .join(", ")}{" "}
+                      — this matches an allergy in your profile.
+                    </Text>
+                  </View>
+                )}
+
+                <Text style={styles.mealSectionLabel}>Ingredients</Text>
                 <Text style={styles.mealSectionText}>
                   {selectedMeal.ingredients.join(", ")}
                 </Text>
 
-                <Text style={styles.mealSectionLabel}>Allergenen</Text>
+                <Text style={styles.mealSectionLabel}>Allergens</Text>
                 <Text style={styles.mealSectionText}>
                   {selectedMeal.allergens.length > 0
                     ? selectedMeal.allergens.join(", ")
-                    : "Geen bekende allergenen"}
+                    : "No known allergens"}
                 </Text>
               </View>
 
@@ -191,8 +241,8 @@ export default function Planner() {
               >
                 <Text style={styles.planMealButtonText}>
                   {isPlanningMeal
-                    ? "Bezig met plannen..."
-                    : `Plan on ${formatDate(selectedDate)}`}
+                    ? "Planning..."
+                    : `Plan meal on ${formatDate(selectedDate)}`}
                 </Text>
               </Pressable>
             </>
@@ -210,7 +260,7 @@ export default function Planner() {
                     web: "arrow_back",
                   }}
                   size={26}
-                  tintColor="black"
+                  tintColor={COLORS.teal}
                 />
               </Pressable>
               <Text style={styles.selectedDate}>
@@ -226,19 +276,19 @@ export default function Planner() {
                 data={meals}
                 labelField="name"
                 valueField="name"
-                placeholder="Meals"
+                placeholder="Select a meal"
                 onChange={(meal) => setSelectedMeal(meal)}
               />
 
               <View style={styles.dividerRow}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>of</Text>
+                <Text style={styles.dividerText}>or</Text>
                 <View style={styles.dividerLine} />
               </View>
 
               <Link href="/add-meal" asChild>
                 <Pressable style={styles.addMealButton}>
-                  <Text style={styles.addMealButtonText}>+ Nieuw Recept</Text>
+                  <Text style={styles.addMealButtonText}>+ New Recipe</Text>
                 </Pressable>
               </Link>
             </>
@@ -266,7 +316,7 @@ export default function Planner() {
               style={styles.confirmButton}
               onPress={() => setSelectedDate(pendingDate)}
             >
-              <Text style={styles.confirmButtonText}>Bevestigen</Text>
+              <Text style={styles.confirmButtonText}>Confirm</Text>
             </Pressable>
           </>
         )}
@@ -277,7 +327,7 @@ export default function Planner() {
           style={[styles.toast, { bottom: 80 + insets.bottom }]}
           pointerEvents="none"
         >
-          <Text style={styles.toastText}>Maaltijd gepland!</Text>
+          <Text style={styles.toastText}>Meal planned!</Text>
         </View>
       )}
     </View>
@@ -294,7 +344,7 @@ const styles = StyleSheet.create({
   toast: {
     position: "absolute",
     alignSelf: "center",
-    backgroundColor: "#1c1c1e",
+    backgroundColor: COLORS.teal,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -327,6 +377,7 @@ const styles = StyleSheet.create({
   selectedDate: {
     fontSize: 28,
     fontWeight: "700",
+    color: COLORS.teal,
   },
   dropdown: {
     width: "100%",
@@ -355,10 +406,25 @@ const styles = StyleSheet.create({
   mealName: {
     fontSize: 22,
     fontWeight: "700",
+    color: COLORS.teal,
   },
   mealDescription: {
     fontSize: 15,
     color: "#444",
+  },
+  allergyWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#fff6da",
+  },
+  allergyWarningText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#6b5900",
+    fontWeight: "600",
   },
   mealSectionLabel: {
     fontSize: 14,
@@ -374,7 +440,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: "#1c1c1e",
+    backgroundColor: COLORS.orange,
     alignItems: "center",
   },
   planMealButtonDisabled: {
@@ -407,18 +473,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#1c1c1e",
+    borderColor: COLORS.teal,
     alignItems: "center",
   },
   addMealButtonText: {
     fontSize: 16,
     fontWeight: "600",
+    color: COLORS.teal,
   },
   confirmButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    backgroundColor: "#1c1c1e",
+    backgroundColor: COLORS.orange,
   },
   confirmButtonText: {
     color: "#fff",
