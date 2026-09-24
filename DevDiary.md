@@ -1242,3 +1242,51 @@ Two separate issues came up back to back:
 
 - `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
 - `npx expo export --platform web` — built successfully with no errors across all routes.
+
+## Entry 50 — `npm start` now actually starts the dev client, not Expo Go
+
+**Date:** 2026-09-24
+
+**Prompt given:**
+> "why are those commands not inside of the package.json" (referring to the `npx expo start --dev-client [--tunnel]` commands being run directly instead of through an npm script)
+
+### What I built
+
+- **`package.json`** — `"start"` was still `"expo start"`, left over from before this project needed a dev client (Entry-43-era, when Expo Go could still run it). That default launches Expo Go mode, which no longer works for this app at all — so the script itself was quietly wrong, not just inconvenient. Changed it to `"expo start --dev-client"`, and added a new `"start:tunnel": "expo start --dev-client --tunnel"` for the network-isolation case (school Wi-Fi blocking phone↔Mac LAN discovery, see the earlier History-tab session).
+
+### How I verified it
+
+- Ran `npm start` and confirmed it launches with `--dev-client` behavior (same Metro startup as the manual command it replaces).
+
+## Entry 51 — `npm start` now prints the manual dev-client URL up front
+
+**Date:** 2026-09-24
+
+**Prompt given:**
+> "it is connected, im just saying make it so that the url is shown when using the start command. This way we can enter it manually since the finding automatically does not work"
+
+### What I built
+
+- **`scripts/print-dev-url.js`** — new file. Reads the Mac's local IPv4 address via Node's built-in `os.networkInterfaces()` (skipping loopback/internal interfaces) and prints `http://<ip>:8081` — the exact string to type into the dev-client's "Enter URL manually" field when its own auto-discovery fails (the client-isolated-network problem from the earlier History-tab session). This is needed because, unlike Expo Go, a dev client doesn't print its own scannable URL/QR on `expo start` — it just waits for auto-discovery, silently, with no fallback shown anywhere.
+- **`package.json`** — `"start"` now runs this script first, then `expo start --dev-client`, so the manual URL is always visible immediately at the top of the terminal output rather than something that has to be separately calculated after the fact.
+
+### How I verified it
+
+- Ran `node ./scripts/print-dev-url.js` directly — printed `Dev client manual URL: http://192.168.0.101:8081`, matching the Mac's actual current LAN IP.
+
+## Entry 52 — History's daily overview list, and chart readability tweaks
+
+**Date:** 2026-09-24
+
+**Prompt given:**
+> "Now let's complete the UI of the history page. Beneath the chart we add those days with their additional data, check the wireframe." — preceded by two small chart-readability asks: "any way to make the y axes text smaller and less dark" and "the dotted horizontal lines can also be a little bit lighter"
+
+### What I built
+
+- **`(tabs)/history.tsx`** BarChart tweaks: added `yAxisTextStyle` (reusing the same small/muted `chartAxisLabel` style already used for the x-axis, so both match) and `rulesColor="#e5e0d3"` for the horizontal guide lines — a light beige closer to the card's white/cream tones instead of the library's default grey.
+- Added the "Daily overview" list beneath the chart, matching the wireframe's `Dagelijkse overzicht` rows: one white card row per day, showing the short date (`Mon 22 Sep`), the signed net-balance value (`+420 kcal` / `-880 kcal`, explicit `+` added for positive since template-string interpolation only gives you the `-` for free), and a colored dot + label for status (`STATUS_LABELS`: within → "Within goal", tooHigh → "Too high", tooLow → "Too low", noData → "No data") — reusing the exact same `STATUS_COLORS` map the bars themselves use, so the list and chart always agree on a given day's color.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
