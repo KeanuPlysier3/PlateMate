@@ -1290,3 +1290,134 @@ Two separate issues came up back to back:
 
 - `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
 - `npx expo export --platform web` — built successfully with no errors across all routes.
+
+## Entry 53 — Home's meal cards open a full-detail modal via a dynamic route
+
+**Date:** 2026-09-24
+
+**Prompt given:**
+> "alright every card inside of the home menu will be able to be pressed. When you press it you open a dynamic route. This route leads to a modal that simply displays the entire meal, and all of it's data. The route simply uses the name of the meal it'selfs inside the dynamic route we grab that searchParam and look for it in the combined array of custom and native meals similar as we did with the dropdown."
+(delivering on the "later we will have a detail page" note from the earlier day-card/trash-icon work)
+
+### What I built
+
+- **`src/app/meal/[name].tsx`** — new dynamic route. Reads the `name` param via `useLocalSearchParams`, then — same lookup Planner already does for its dropdown — combines the bundled `meals.json` with `CUSTOM_MEALS_STORAGE_KEY`'s custom meals and finds the one whose `name` matches. Renders the full detail: image, calories, description, an allergy warning banner (reusing `findMatchingAllergens`/`getAllergenLabel` against the user's stored allergies) if applicable, ingredients, allergens, and the recipe link. Shows a plain "Meal not found" fallback if nothing matches (e.g. a stale link to a deleted custom meal).
+- **`_layout.tsx`** — registered `meal/[name]` as a modal `Stack.Screen`, same presentation as `profile`/`add-meal`.
+- **`(tabs)/index.tsx`** — wrapped the meal-bearing parts of both the "Today" card (image + name) and each upcoming day's card (`dayCardInfo`) in a `Link` to `{ pathname: "/meal/[name]", params: { name: meal.name } }`, but only when that day actually has a planned meal — a day with nothing planned yet has no detail to show, so it stays a plain, non-pressable `Text`. The day cards' existing `+`/trash icon on the right is untouched, since it's a separate `Pressable` outside the now-linked info section.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully; confirmed `/meal/[name]` appears in the exported route list.
+
+## Entry 54 — Fixed Home's "Today" card tap target, then restyled the meal detail modal
+
+**Date:** 2026-09-24
+
+**Prompt given:**
+> "You simply do not put the entire card inside the pressable. The stats row etc and tip are also part of that card remember" — followed by: "yes ok, now update the UI of that dynamic route so that it looks a bit better and more realistic rather than boring text with a title."
+
+### The tap-target bug
+
+What looked like a Pressable hit-testing bug (only a thin horizontal band at the card's vertical center responded to taps, any x) was never actually a bug — it was scope. Entry 53 had only wrapped the meal image + name in the `Link`/`Pressable`, not the whole card; that small wrapped region just happened to sit near the vertical middle of the much taller full card, which is exactly the band that responded. Restructured `(tabs)/index.tsx` so the entire "Today" card's content (label, date, image/name, stats row, tip) is built once as `focusCardContent`, then that same content is rendered inside either a `Pressable`/`Link` (when `todayMeal` exists) or a plain `View` (when it doesn't) — so the *whole* card, not a sub-region, is the tap target now.
+
+### Meal detail modal restyle
+
+`meal/[name].tsx` was plain stacked `Text` elements with section labels — functional but exactly the "boring text with a title" described. Restyled to match the wireframe's recipe-detail look:
+- Full-bleed image at the top (edge-to-edge, no padding) with a floating orange calorie badge (flame icon + kcal) overlaid on its bottom-right corner, rather than calories being just another line of text.
+- Ingredients and allergens now render as chip/tag rows (same rounded-pill visual language as Profile's allergy tags) instead of a single comma-joined sentence — allergen chips specifically reuse the same amber warning color as the allergy banner, so allergens read as "caution-colored" at a glance even outside the banner.
+- The recipe link is now a real bordered button ("Open recipe") that calls `Linking.openURL(meal.link)` on press, instead of just displaying the raw URL as unclickable text.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+
+## Entry 55 — Planner's calendar can look back at already-planned past dates
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "Is it possible to make it so that you can click on previous dates that were in the plannedMeals asyncStorage key, and also put them on the calendar. This allows them to click on the meal and see an overview but it disables the plann this meal button since it is in the past?" — confirmed with "ok let's try it" after I laid out the implementation plan first.
+
+### What I built
+
+- **`(tabs)/planner.tsx`** now reads `PLANNED_MEALS_STORAGE_KEY` into local state (it previously only ever *wrote* to it) — same `useFocusEffect` pattern already used for `customMeals`/allergies here and for `plannedMeals` on Home/History.
+- Removed the calendar's `minDate` (which blocked every past day outright) and instead mark past dates that actually have a planned meal with a small teal dot (`markedDates`), built from `Object.keys(plannedMeals)` filtered to date-keys before today — comparing the `"YYYY-MM-DD"` strings directly rather than parsing them back into `Date`s, since that format sorts correctly as plain strings and avoids any timezone-parsing footguns.
+- **`handleDayPress`** now branches: a past date with a planned meal jumps straight to the overview screen (`setSelectedDate` + `setSelectedMeal` together, skipping the dropdown step entirely — a past day's meal is a fixed record, not something to pick). A past date with nothing planned does nothing. Today/future dates keep the exact same pendingDate → Confirm → dropdown flow as before.
+- Added `isPastDate` (`selectedDate < getStartOfToday()`). On the overview screen: the "Plan meal on ..." button stays visible but is disabled and relabeled "This date has already passed" when `isPastDate` (reusing the existing disabled visual style, not inventing a new one) — matching "disables the button" rather than hiding it. The back chevron calls `handleReset()` (straight to the calendar) instead of `setSelectedMeal(null)` (the dropdown screen) for a past date, since that dropdown step never happened for it in the first place.
+- **`handlePlanMeal`** also now calls `setPlannedMeals(...)` after a successful save, so the calendar's dots reflect a just-planned meal immediately without needing to leave and refocus the tab. Renamed its local `plannedMeals` variable to `updatedPlannedMeals` to avoid shadowing the new state.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` on the file afterward to clean up indentation from the edits; `tsc --noEmit` stayed clean after.
+
+## Entry 56 — Empty past days on the calendar are now visibly greyed out
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "Ok but if a date does not have a planned meal, it should just be greyed out"
+
+### What I built
+
+- **`(tabs)/planner.tsx`** — added `PAST_GREYOUT_DAYS = 90` and a `pastEmptyDayMarks` loop that marks every day in that window without a `plannedMeals` entry as `{ disabled: true, disableTouchEvent: true }` in the calendar's `markedDates`, merged alongside the existing teal-dot marks for past days that *do* have a meal. Also added `disableAllTouchEventsForDisabledDays` on the `Calendar` itself as a second layer of protection against `onDayPress` firing for a greyed day.
+- This can't cover literally every day since the beginning of time — `react-native-calendars` needs one real `markedDates` entry per day to style it, so an unbounded loop isn't practical. 90 days is a reasonable bound for realistic use; anything older just renders unmarked (normal-looking) rather than grey, though tapping it is still a safe no-op either way since `handleDayPress` checks `plannedMeals` directly, independent of this greyout window.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` afterward; `tsc --noEmit` stayed clean.
+
+## Entry 57 — Reverted the past-days greyout from Entry 56
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "remove that change" (referring to Entry 56's `pastEmptyDayMarks` greyout)
+
+### What I built
+
+- **`(tabs)/planner.tsx`** — removed `PAST_GREYOUT_DAYS`, the `pastEmptyDayMarks` loop, and `disableAllTouchEventsForDisabledDays`, restoring the calendar to Entry 55's behavior: past dates with a planned meal still show a teal dot and are tappable; empty past dates render unmarked (not greyed) but are still a no-op when tapped, since `handleDayPress` checks `plannedMeals` directly regardless of any visual marking.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+
+## Entry 58 — Unbounded past-day greyout, without looping over calendar days
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "disabledByDefault for every date before today" (following a discussion about `disabledByDefault` disabling future dates too, which isn't wanted)
+
+### What I built
+
+- **`(tabs)/planner.tsx`** — restored `minDate={toDateKey(getStartOfToday())}` on the `Calendar`, which disables every day before today automatically and unboundedly (react-native-calendars' own range check), unlike Entry 56's bounded 90-day loop. Added `disabled: false` to the existing per-day `markedDates` entry for past dates that have a planned meal — read the library's source (`calendar/day/basic/index.js`) to confirm a day's own `marking.disabled` is checked before falling back to the `minDate`-computed disabled state, so this explicit override re-enables exactly those specific days without needing to enumerate anything. Net result: unbounded past-day disabling with no loop, only iterating over `Object.keys(plannedMeals)` (already small and bounded by however many meals actually exist) to punch through the few exceptions.
+- Deliberately did *not* use the `disabledByDefault` prop itself — checked its implementation and it disables every day including future ones, which would require enumerating and re-enabling an even larger, still-unbounded set (every future date someone might plan into) — worse than the problem it was meant to solve.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Read `node_modules/react-native-calendars/src/day-state-manager.js` and `calendar/day/basic/index.js` directly to confirm the disabled-state override behavior before relying on it, rather than assuming.
+
+## Entry 59 — Fixed past dates not actually responding to taps
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "clicking on those past days that have a meal does not do anything"
+
+### What I built
+
+- **`(tabs)/planner.tsx`** — added `allowSelectionOutOfRange` to the `Calendar`. Read `react-native-calendars`' source (`calendar/index.js`'s `handleDayInteraction`) to find the real cause: `onDayPress` is gated purely on `minDate`/`maxDate` at the `Calendar` level, with zero awareness of any per-day `markedDates.disabled` override — so a past date's `disabled: false` override (Entry 58) correctly made it *look* enabled, but its tap was still silently swallowed before `onDayPress` ever fired. `allowSelectionOutOfRange` bypasses that gate so every tap reaches `handleDayPress`, which already re-implements the real "does this do anything" decision itself (opens the meal if one's planned for that date, no-ops otherwise) — so this is safe: the greyed-out look for past dates *without* an override still comes entirely from `minDate`'s styling, untouched by this change.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Read `node_modules/react-native-calendars/src/calendar/index.js` directly to trace the actual gating logic before picking a fix, rather than guessing.

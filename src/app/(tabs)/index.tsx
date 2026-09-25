@@ -1,5 +1,12 @@
 import { useCallback, useState } from "react";
-import { Image, Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  StyleSheet,
+} from "react-native";
 import { Link, useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -62,9 +69,11 @@ export default function Home() {
     const updated = { ...plannedMeals };
     delete updated[dateKey];
     setPlannedMeals(updated);
-    await AsyncStorage.setItem(PLANNED_MEALS_STORAGE_KEY, JSON.stringify(updated));
+    await AsyncStorage.setItem(
+      PLANNED_MEALS_STORAGE_KEY,
+      JSON.stringify(updated),
+    );
   };
-
 
   // Re-reads the goal/margin set on Profile every time this screen gains
   // focus, same reasoning as plannedMeals above.
@@ -114,111 +123,130 @@ export default function Home() {
   const currentDifference =
     burnedCalories !== null ? burnedCalories - plannedIntake : null;
 
+  // Shared between both branches below — the whole focus card links to the
+  // meal detail modal when one exists, so its contents can't live inside
+  // that conditional themselves.
+  const focusCardContent = (
+    <>
+      <Text style={styles.focusLabel}>Today</Text>
+      <Text style={styles.focusDate}>{formatDate(today)}</Text>
+
+      {todayMeal ? (
+        <>
+          <Image
+            source={resolveMealImage(todayMeal.image)}
+            style={styles.focusMealImage}
+          />
+          <Text style={styles.focusMealName}>{todayMeal.name}</Text>
+        </>
+      ) : (
+        <Text style={styles.focusMealName}>No meal planned yet</Text>
+      )}
+
+      <View style={styles.statsRow}>
+        <View style={styles.statTile}>
+          <SymbolView
+            name={{
+              ios: "fork.knife",
+              android: "restaurant",
+              web: "restaurant",
+            }}
+            size={22}
+            tintColor={COLORS.teal}
+          />
+          <Text style={styles.statValue}>
+            {todayMeal ? `${todayMeal.calories} kcal` : "–"}
+          </Text>
+          <Text style={styles.statLabel}>Planned intake</Text>
+        </View>
+
+        <View style={styles.statTile}>
+          <SymbolView
+            name={{
+              ios: "flame.fill",
+              android: "local_fire_department",
+              web: "local_fire_department",
+            }}
+            size={22}
+            tintColor={COLORS.orange}
+          />
+          <Text style={styles.statValue}>
+            {burnedCalories !== null
+              ? `${Math.round(burnedCalories)} kcal`
+              : "–"}
+          </Text>
+          <Text style={styles.statLabel}>Live burn</Text>
+        </View>
+
+        <View style={styles.statTile}>
+          <SymbolView
+            name={{
+              ios: "target",
+              android: "track_changes",
+              web: "track_changes",
+            }}
+            size={22}
+            tintColor={COLORS.teal}
+          />
+          <Text style={styles.statValue}>
+            {currentDifference !== null
+              ? `${Math.round(Math.abs(currentDifference))} kcal`
+              : "–"}
+          </Text>
+          <Text style={styles.statLabel}>Difference</Text>
+        </View>
+      </View>
+
+      {todayMeal ? (
+        <View style={styles.tipBox}>
+          <SymbolView
+            name={{
+              ios: "lightbulb.fill",
+              android: "lightbulb",
+              web: "lightbulb",
+            }}
+            size={18}
+            tintColor="#8a6d00"
+          />
+          <Text style={styles.tipText}>
+            {currentDifference !== null
+              ? getCalorieTip(
+                  weightGoal,
+                  calorieMargin,
+                  burnedCalories ?? 0,
+                  plannedIntake,
+                )
+              : "Connect Apple Health to get a personalized tip here."}
+          </Text>
+        </View>
+      ) : (
+        <Link
+          href={{ pathname: "/planner", params: { date: toDateKey(today) } }}
+          asChild
+        >
+          <Pressable style={styles.planTodayButton}>
+            <Text style={styles.planTodayButtonText}>Plan meal</Text>
+          </Pressable>
+        </Link>
+      )}
+    </>
+  );
+
   return (
     <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.container}
     >
-      <View style={styles.focusCard}>
-        <Text style={styles.focusLabel}>Today</Text>
-        <Text style={styles.focusDate}>{formatDate(today)}</Text>
-
-        {todayMeal && (
-          <Image
-            source={resolveMealImage(todayMeal.image)}
-            style={styles.focusMealImage}
-          />
-        )}
-
-        <Text style={styles.focusMealName}>
-          {todayMeal ? todayMeal.name : "No meal planned yet"}
-        </Text>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statTile}>
-            <SymbolView
-              name={{
-                ios: "fork.knife",
-                android: "restaurant",
-                web: "restaurant",
-              }}
-              size={22}
-              tintColor={COLORS.teal}
-            />
-            <Text style={styles.statValue}>
-              {todayMeal ? `${todayMeal.calories} kcal` : "–"}
-            </Text>
-            <Text style={styles.statLabel}>Planned intake</Text>
-          </View>
-
-          <View style={styles.statTile}>
-            <SymbolView
-              name={{
-                ios: "flame.fill",
-                android: "local_fire_department",
-                web: "local_fire_department",
-              }}
-              size={22}
-              tintColor={COLORS.orange}
-            />
-            <Text style={styles.statValue}>
-              {burnedCalories !== null ? `${Math.round(burnedCalories)} kcal` : "–"}
-            </Text>
-            <Text style={styles.statLabel}>Live burn</Text>
-          </View>
-
-          <View style={styles.statTile}>
-            <SymbolView
-              name={{
-                ios: "target",
-                android: "track_changes",
-                web: "track_changes",
-              }}
-              size={22}
-              tintColor={COLORS.teal}
-            />
-            <Text style={styles.statValue}>
-              {currentDifference !== null
-                ? `${Math.round(Math.abs(currentDifference))} kcal`
-                : "–"}
-            </Text>
-            <Text style={styles.statLabel}>Difference</Text>
-          </View>
-        </View>
-
-        {todayMeal ? (
-          <View style={styles.tipBox}>
-            <SymbolView
-              name={{
-                ios: "lightbulb.fill",
-                android: "lightbulb",
-                web: "lightbulb",
-              }}
-              size={18}
-              tintColor="#8a6d00"
-            />
-            <Text style={styles.tipText}>
-              {currentDifference !== null
-                ? getCalorieTip(
-                    weightGoal,
-                    calorieMargin,
-                    burnedCalories ?? 0,
-                    plannedIntake,
-                  )
-                : "Connect Apple Health to get a personalized tip here."}
-            </Text>
-          </View>
-        ) : (
-          <Link
-            href={{ pathname: "/planner", params: { date: toDateKey(today) } }}
-            asChild
-          >
-            <Pressable style={styles.planTodayButton}>
-              <Text style={styles.planTodayButtonText}>Plan meal</Text>
-            </Pressable>
-          </Link>
-        )}
-      </View>
+      {todayMeal ? (
+        <Link
+          href={{ pathname: "/meal/[name]", params: { name: todayMeal.name } }}
+          asChild
+        >
+          <Pressable style={styles.focusCard}>{focusCardContent}</Pressable>
+        </Link>
+      ) : (
+        <View style={styles.focusCard}>{focusCardContent}</View>
+      )}
 
       <Text style={styles.sectionTitle}>Upcoming days</Text>
 
@@ -226,16 +254,24 @@ export default function Home() {
         const meal = plannedMeals[toDateKey(date)];
         return (
           <View key={toDateKey(date)} style={styles.dayCard}>
-            <View style={styles.dayCardInfo}>
-              <Text style={styles.dayCardDate}>{formatDate(date)}</Text>
-              {meal ? (
-                <Text style={styles.dayCardMeal}>
-                  {meal.name} · {meal.calories} kcal
-                </Text>
-              ) : (
+            {meal ? (
+              <Link
+                href={{ pathname: "/meal/[name]", params: { name: meal.name } }}
+                asChild
+              >
+                <Pressable style={styles.dayCardInfo}>
+                  <Text style={styles.dayCardDate}>{formatDate(date)}</Text>
+                  <Text style={styles.dayCardMeal}>
+                    {meal.name} · {meal.calories} kcal
+                  </Text>
+                </Pressable>
+              </Link>
+            ) : (
+              <View style={styles.dayCardInfo}>
+                <Text style={styles.dayCardDate}>{formatDate(date)}</Text>
                 <Text style={styles.dayCardMealEmpty}>Plan meal</Text>
-              )}
-            </View>
+              </View>
+            )}
 
             {meal ? (
               <Pressable
@@ -250,7 +286,10 @@ export default function Home() {
               </Pressable>
             ) : (
               <Link
-                href={{ pathname: "/planner", params: { date: toDateKey(date) } }}
+                href={{
+                  pathname: "/planner",
+                  params: { date: toDateKey(date) },
+                }}
                 asChild
               >
                 <Pressable style={styles.dayCardAddButton} hitSlop={8}>

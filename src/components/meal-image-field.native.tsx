@@ -24,10 +24,7 @@ export default function MealImageField({
 
     const pickedUri = result.assets[0].uri;
 
-    // The picker's own URI can live in a temporary/cache location that isn't
-    // guaranteed to stick around, so copy it into the app's own persistent
-    // storage (Paths.document) right away — this is the file the Meal.image
-    // path will actually point to.
+   
     const mealsDir = new Directory(Paths.document, "meals"); //paths.document is the app's persistent storage directory, "meals" is a subdirectory for meal images
     mealsDir.create({ idempotent: true }); //idempotent: true means that if the directory already exists, it won't throw an error
 
