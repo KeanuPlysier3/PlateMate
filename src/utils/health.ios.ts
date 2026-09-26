@@ -13,18 +13,27 @@ export async function getBurnedCaloriesForDate(
 
   const filter = { date: { startDate: startOfDay, endDate } };
 
-  const [active, resting] = await Promise.all([
-    queryStatisticsForQuantity(
-      "HKQuantityTypeIdentifierActiveEnergyBurned",
-      ["cumulativeSum"],
-      { filter },
-    ),
-    queryStatisticsForQuantity(
-      "HKQuantityTypeIdentifierBasalEnergyBurned",
-      ["cumulativeSum"],
-      { filter },
-    ),
-  ]);
+  // Querying before the user has ever been asked for Health access throws a
+  // native "authorization not determined" error (HKError code 5), not just
+  // an empty result — treat that the same as "no data" rather than letting
+  // it surface as an unhandled rejection.
+  let active, resting;
+  try {
+    [active, resting] = await Promise.all([
+      queryStatisticsForQuantity(
+        "HKQuantityTypeIdentifierActiveEnergyBurned",
+        ["cumulativeSum"],
+        { filter },
+      ),
+      queryStatisticsForQuantity(
+        "HKQuantityTypeIdentifierBasalEnergyBurned",
+        ["cumulativeSum"],
+        { filter },
+      ),
+    ]);
+  } catch {
+    return null;
+  }
 
   if (active.sumQuantity === undefined && resting.sumQuantity === undefined) {
     return null;

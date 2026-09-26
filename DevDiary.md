@@ -1581,3 +1581,19 @@ Left alone (confirmed by the subagent as genuine WHY, not flagged): `utils/meals
 
 - Grepped every dependency in `package.json` against `src/` import statements before writing the libraries section, rather than assuming from memory.
 - Confirmed the `PHYSICAL_DEVICE_SETUP.md` link target actually exists in the repo.
+
+## Entry 67 — Fixed a crash on first launch: querying HealthKit before permission was ever requested
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "I got the app to launch. When opening it loads for a second and then i got hit with unCaught in promis, id:1 erroor. Domain = com.apple.healthkit code=5 authorisation not determined. UserInfo NSLocalizedDescription=authorization not determined." (on a fresh install on a new phone, via `PHYSICAL_DEVICE_SETUP.md`)
+
+### What I built
+
+- **`utils/health.ios.ts`** — `getBurnedCaloriesForDate` calls `queryStatisticsForQuantity` as soon as Home mounts (via its `useFocusEffect`), regardless of whether Health access has ever been requested. On a genuinely fresh install — nothing has ever tapped "Connect" on Profile's Apple Health row yet — HealthKit doesn't return an empty result for that, it *throws* a native error (`HKError` code 5, `authorization not determined`), which wasn't wrapped in a try/catch anywhere, so it surfaced as an unhandled promise rejection instead of failing gracefully. Wrapped the query in `try`/`catch`, returning `null` — the same "no data" value this function already returns for other reasons (zero HealthKit samples that day) — so an unauthorized/not-yet-asked state is just one more case of "no data" to every caller, rather than a crash.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully; re-confirmed the HealthKit code stays out of the web bundle.
