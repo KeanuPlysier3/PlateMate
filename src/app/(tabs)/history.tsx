@@ -80,7 +80,6 @@ export default function History() {
       return () => {
         isActive = false;
       };
-      //we have to recompute the history whenever these values change.
     }, [plannedMeals, weightGoal, calorieMargin]),
   );
 
@@ -90,14 +89,13 @@ export default function History() {
     label: day.date.toLocaleDateString(undefined, { weekday: "short" }),
   }));
 
-
   const maxAbsBalance = Math.max(
     100,
     ...historyDays.map((day) =>
       day.netBalance !== null ? Math.abs(day.netBalance) : 0,
     ),
   );
-  const chartMax = Math.ceil(maxAbsBalance / 50) * 50;//round up to nearest 50
+  const chartMax = Math.ceil(maxAbsBalance / 50) * 50;
 
   return (
     <ScrollView

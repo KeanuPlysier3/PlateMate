@@ -11,9 +11,10 @@ import {
 import { SymbolView } from "expo-symbols";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { COMMON_ALLERGENS, getAllergenLabel } from "@/constants/allergens";
+import { COMMON_ALLERGENS } from "@/constants/allergens";
 import { COLORS } from "@/constants/theme";
 import { useAppState } from "@/hooks/use-appState";
+import { getAllergenLabel } from "@/utils/allergens";
 import type { WeightGoal } from "@/utils/calorie-tips";
 import HealthConnectionStatus from "@/components/health-connection-status";
 
@@ -85,7 +86,6 @@ export default function Profile() {
     setAllergies(allergies.filter((item) => item !== allergen));
   };
 
-
   const applyPace = (pace: Pace) => {
     if (pace === "gentle") {
       setCalorieMargin(GENTLE_MARGIN);
@@ -112,7 +112,7 @@ export default function Profile() {
   };
 
   const handleChangeCustomMargin = (text: string) => {
-    const sanitized = text.replace(/[^0-9]/g, "").replace(/^0+/, ""); //remove any non-digit characters and leading zeros
+    const sanitized = text.replace(/[^0-9]/g, "").replace(/^0+/, "");
     setCustomMarginText(sanitized);
     setCalorieMargin(Number(sanitized)); //Number("") is 0, so an emptied field correctly resolves to 0
   };
@@ -170,7 +170,7 @@ export default function Profile() {
           );
         })}
         {allergies
-          .filter((allergen) => !COMMON_ALLERGENS.includes(allergen)) //filter out any custom allergens that are already in the common list, so we don't duplicate them
+          .filter((allergen) => !COMMON_ALLERGENS.includes(allergen)) // avoid duplicating common allergens
           .map((allergen) => (
             <View
               key={allergen}

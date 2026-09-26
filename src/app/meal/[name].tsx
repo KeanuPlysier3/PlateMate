@@ -10,38 +10,23 @@ import {
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import mealsData from "@/data/meals.json";
-import {
-  ALLERGIES_STORAGE_KEY,
-  CUSTOM_MEALS_STORAGE_KEY,
-} from "@/constants/storage";
 import { COLORS } from "@/constants/theme";
-import { findMatchingAllergens, getAllergenLabel } from "@/constants/allergens";
+import { findMatchingAllergens, getAllergenLabel } from "@/utils/allergens";
+import { useAppState } from "@/hooks/use-appState";
+import { getAllMeals } from "@/utils/meals";
 import { resolveMealImage } from "@/utils/resolve-meal-image";
 import type { Meal } from "@/types/meal";
 
-// Same bundled-meals typing rationale as planner.tsx.
-const bundledMeals: Meal[] = mealsData.meals;
-
 export default function MealDetail() {
   const { name } = useLocalSearchParams<{ name: string }>();
+  const userAllergies = useAppState((state) => state.allergies);
   const [meal, setMeal] = useState<Meal | null>(null);
-  const [userAllergies, setUserAllergies] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [storedCustomMeals, storedAllergies] = await Promise.all([
-        AsyncStorage.getItem(CUSTOM_MEALS_STORAGE_KEY),
-        AsyncStorage.getItem(ALLERGIES_STORAGE_KEY),
-      ]);
-      const customMeals: Meal[] = storedCustomMeals
-        ? JSON.parse(storedCustomMeals)
-        : [];
-      const allMeals = [...bundledMeals, ...customMeals];
+      const allMeals = await getAllMeals();
       setMeal(allMeals.find((candidate) => candidate.name === name) ?? null);
-      setUserAllergies(storedAllergies ? JSON.parse(storedAllergies) : []);
     })();
   }, [name]);
 

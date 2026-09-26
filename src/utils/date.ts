@@ -5,14 +5,14 @@
 // of the app one canonical, comparable identifier for "this calendar day."
 export const toDateKey = (date: Date): string => {
   const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0"); //add 1 to month because js indexes months from 0
-  const day = `${date.getDate()}`.padStart(2, "0"); //padStart to ensure day is always 2 digits
+  const month = `${date.getMonth() + 1}`.padStart(2, "0"); // JS months are 0-indexed
+  const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
 export const getStartOfToday = (): Date => {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);//set time to midnight to get the start of the day
+  today.setHours(0, 0, 0, 0);
   return today;
 };
 

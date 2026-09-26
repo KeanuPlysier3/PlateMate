@@ -20,30 +20,22 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import mealsData from "@/data/meals.json";
-import {
-  CUSTOM_MEALS_STORAGE_KEY,
-  LAST_ADDED_MEAL_STORAGE_KEY,
-} from "@/constants/storage";
-import { findMatchingAllergens, getAllergenLabel } from "@/constants/allergens";
+import { LAST_ADDED_MEAL_STORAGE_KEY } from "@/constants/storage";
+import { findMatchingAllergens, getAllergenLabel } from "@/utils/allergens";
 import { COLORS } from "@/constants/theme";
 import { useAppState } from "@/hooks/use-appState";
+import { bundledMeals, getAllMeals } from "@/utils/meals";
 import { resolveMealImage } from "@/utils/resolve-meal-image";
 import { toDateKey, getStartOfToday, formatDate } from "@/utils/date";
 import type { Meal } from "@/types/meal";
-
-// Typing this assignment as Meal[] makes TypeScript check every entry in
-// meals.json against the Meal shape (name/allergens/ingredients/description/link/image)
-// at compile time — a structurally invalid meal fails the build, not runtime.
-const bundledMeals: Meal[] = mealsData.meals;
 
 const ACCENT_COLOR = COLORS.orange;
 
 export default function Planner() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [pendingDate, setPendingDate] = useState<Date>(getStartOfToday); //initialize pendingDate to the start of today
+  const [pendingDate, setPendingDate] = useState<Date>(getStartOfToday);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
-  const [meals, setMeals] = useState<Meal[]>(bundledMeals); //initialize meals state with bundledMeals
+  const [meals, setMeals] = useState<Meal[]>(bundledMeals);
   const [isPlanningMeal, setIsPlanningMeal] = useState(false);
   const [showPlannedToast, setShowPlannedToast] = useState(false);
   const userAllergies = useAppState((state) => state.allergies);
@@ -72,22 +64,18 @@ export default function Planner() {
     if (!showPlannedToast) {
       return;
     }
-    const timeoutId = setTimeout(() => setShowPlannedToast(false), 3000); //dismiss after 3 seconds
+    const timeoutId = setTimeout(() => setShowPlannedToast(false), 3000);
     return () => clearTimeout(timeoutId);
   }, [showPlannedToast]);
 
   //reread custom meals from AsyncStorage whenever the planner screen is focused, so that the dropdown list of meals is always up to date
   useFocusEffect(
     useCallback(() => {
-      //this prevents the useFocusEffect from being called multiple times when the component re-renders
+      // guards against duplicate focus-effect runs
       let isActive = true;
 
       (async () => {
-        const storedValue = await AsyncStorage.getItem(
-          CUSTOM_MEALS_STORAGE_KEY,
-        ); //storedValue is a stringified JSON array of custom meals, or null if no custom meals have been added yet
-        const customMeals: Meal[] = storedValue ? JSON.parse(storedValue) : [];
-        const allMeals = [...bundledMeals, ...customMeals];
+        const allMeals = await getAllMeals();
         if (!isActive) {
           return;
         }
@@ -114,7 +102,7 @@ export default function Planner() {
   );
 
   const handleDayPress = (day: DateData) => {
-    const pressedDate = new Date(day.year, day.month - 1, day.day); //js indexes months from 0, so we need to subtract 1 from the month value
+    const pressedDate = new Date(day.year, day.month - 1, day.day); // JS months are 0-indexed
 
     if (pressedDate < getStartOfToday()) {
       //if the pressed date is in the past skip the dropdown step and go straight to the overview screen

@@ -20,7 +20,6 @@ interface AppState {
   resetAppState: () => void;
 }
 
-
 const INITIAL_APP_STATE = {
   plannedMeals: {} as PlannedMeals,
   allergies: [] as string[],
@@ -36,7 +35,6 @@ export const useAppState = create<AppState>()(
 
       planMeal: (dateKey, meal) =>
         set((state) => ({
-          //set is the helper function that updates the state which is the snapshot of the current state.
           plannedMeals: { ...state.plannedMeals, [dateKey]: meal }, //overwrites any meal already planned for this date, by design — one meal per date
         })),
 
@@ -53,7 +51,7 @@ export const useAppState = create<AppState>()(
       resetAppState: () => set(INITIAL_APP_STATE),
     }),
     {
-      name: "appState", // AsyncStorage key this whole store is persisted under
+      name: "appState", // zustand persist key
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),

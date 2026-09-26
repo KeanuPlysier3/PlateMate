@@ -1471,3 +1471,113 @@ Net effect across the four files (`planner.tsx`, `index.tsx`, `history.tsx`, `pr
 - `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
 - `npx expo export --platform web` — built successfully with no errors across all routes.
 - Ran `npx prettier --write` afterward; `tsc --noEmit` stayed clean.
+
+## Entry 62 — Codebase audit: fixed a real allergy-warning bug, removed dead code, condensed comments
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "Check the enitre code base for dead code, Summarise large blocks of comments into one line, only keep comments where needed. report back on all dead code you found." — delegated the read-only audit to a subagent, reviewed its report, then: "go ahead" to act on it.
+
+### What the audit found
+
+- **A real bug, not just dead code**: `meal/[name].tsx` still read the user's allergies via `AsyncStorage.getItem(ALLERGIES_STORAGE_KEY)`, a leftover from before the Entry-60 zustand migration. Since `profile.tsx` writes allergies exclusively through `useAppState` now (persisted under the `"appState"` key), that raw `"allergies"` key was never written anymore — the meal-detail modal's allergy-warning banner was silently always computing against an empty array, meaning it could never actually warn about anything, even though the identical banner on Planner (already on `useAppState`) worked correctly.
+- Three more storage-key exports (`PLANNED_MEALS_STORAGE_KEY`, `WEIGHT_GOAL_STORAGE_KEY`, `CALORIE_MARGIN_STORAGE_KEY`) fully dead for the same reason — exported, never imported anywhere post-migration.
+- `meal/[name].tsx` duplicated the "merge bundled `meals.json` + custom meals from AsyncStorage" logic already in `planner.tsx`, inline, independently.
+- `package.json`'s `"reset-project"` script pointed at a `scripts/reset-project.js` that doesn't exist at the project root (only under `example/`) — broken.
+- A handful of comments that just restated the line right next to them, one with a typo ("yr", "of the").
+- Several npm dependencies that grep across `src/` never imports by name (`@expo/ui`, `expo-device`, `expo-glass-effect`, `expo-linking`, `expo-status-bar`, `expo-system-ui`, `expo-web-browser`, plus some likely peer-deps of native modules already relied on).
+
+### What I built
+
+- **`src/utils/meals.ts`** (new) — `bundledMeals` + `getAllMeals()`, factored out of `planner.tsx`'s inline version, now shared by both `planner.tsx` and `meal/[name].tsx`.
+- **`meal/[name].tsx`** — switched to `useAppState((state) => state.allergies)`, fixing the dead allergy warning; now calls `getAllMeals()` instead of its own duplicate AsyncStorage-merge logic. Removed its now-unused `AsyncStorage`/`ALLERGIES_STORAGE_KEY`/`CUSTOM_MEALS_STORAGE_KEY`/`mealsData` imports.
+- **`planner.tsx`** — now imports `bundledMeals`/`getAllMeals` from the shared util instead of defining its own copy.
+- **`constants/storage.ts`** — removed the three dead exports; only `CUSTOM_MEALS_STORAGE_KEY` and `LAST_ADDED_MEAL_STORAGE_KEY` remain (both still genuinely used, deliberately kept off the zustand store per Entry 60's original decision).
+- **`package.json`** — removed the broken `reset-project` script.
+- Condensed the flagged comments in `meal-image-field.native.tsx` (two comments that just restated the next line, one over-long cleanup explanation), `history-data.ts` (two redundant/typo'd comments merged into one), and `health.ios.ts` (three comments that just repeated the code next to them).
+- **Deliberately left the npm-dependency removals alone.** Checked `app.json`'s `plugins` list first — `expo-splash-screen` genuinely is used there (not dead, despite no direct import). The remaining flagged packages aren't in that list either, but several Expo packages (e.g. `expo-status-bar`, `expo-system-ui`) are known to auto-register native behavior with zero required JS import — "not imported" doesn't reliably mean "safe to remove" for those, and verifying would need a native rebuild to actually test. Flagged as a separate, more careful pass rather than bundling it into this cleanup.
+
+### How I verified it
+
+- `tsc --noEmit` — clean after every step (not just at the end), same pre-existing unrelated `example/` errors as prior entries.
+- `npx expo export --platform web` — built successfully; re-confirmed the HealthKit code still stays out of the web bundle (grepped for `kingstinct`/`HKQuantityTypeIdentifier` in the export output — 0 matches).
+- Ran `npx prettier --write` across every touched file; `tsc --noEmit` stayed clean after.
+
+## Entry 63 — Split allergens.ts: data stays in constants/, functions moved to utils/
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "what differes the constants and utills directory, there seem to be utility functions for the allergens for example inside of the constants folder" → "yes and make sure to fix the imports aswell"
+
+### What I built
+
+- **`src/utils/allergens.ts`** (new) — `getAllergenLabel` and `findMatchingAllergens`, moved out of `constants/allergens.ts`. Both are pure functions with no state, matching the pattern every other file in `utils/` (`date.ts`, `calorie-tips.ts`, `meals.ts`, etc.) already follows — `constants/` elsewhere in this codebase is strictly static data/config (`theme.ts`'s `COLORS`, `storage.ts`'s key names, `meal-images.ts`'s lookup map), so bundling logic in with a constant there was an inconsistency, not a deliberate exception.
+- **`constants/allergens.ts`** — now holds only `COMMON_ALLERGENS`, the actual constant.
+- Updated all three import sites: `planner.tsx` and `meal/[name].tsx` (both only used the two functions, straight path swap) and `profile.tsx` (used both — now imports `COMMON_ALLERGENS` from `constants/allergens` and `getAllergenLabel` from `utils/allergens` separately).
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` across every touched file; `tsc --noEmit` stayed clean after.
+
+## Entry 64 — Second comment-condensing pass across the rest of the codebase
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "I would again ask you to go through the code and do some clean up. Check for large comment blocks. We don't need or want those, just summerise." (following on from Entry 62's first pass, which only covered three files)
+
+### What I built
+
+Delegated a read-only scan of every remaining file to a subagent, then applied its findings — removing/condensing comments that just restated the adjacent code, while leaving genuine non-obvious "why" comments untouched even where multi-line (per this project's stated commenting philosophy). Also fixed two small typos in user-facing text noticed along the way ("dvice" → "device", a missing space in "Access requested,tap").
+
+Touched: `utils/date.ts`, `utils/calorie-tips.ts`, `utils/resolve-meal-image.ts`, `hooks/use-appState.ts`, `(tabs)/history.tsx`, `(tabs)/index.tsx`, `(tabs)/planner.tsx`, `add-meal.tsx`, `profile.tsx`, `components/health-connection-status.ios.tsx`, `components/meal-image-field.native.tsx` — roughly 20 individual comments removed or shortened, each one restating a line already self-evident from the code right next to it (e.g. `//add 1 to month because js indexes months from 0` next to `getMonth() + 1`, `//round up to nearest 50` next to `Math.ceil(x/50)*50`).
+
+Left alone (confirmed by the subagent as genuine WHY, not flagged): `utils/meals.ts`, `utils/allergens.ts`, `utils/health.ts`, both `types/*.ts`, `constants/storage.ts`/`allergens.ts`/`meal-images.ts`/`theme.ts`, both `_layout.tsx` files, `meal/[name].tsx` (no comments), `health-connection-status.tsx`, `meal-image-field.tsx`, both `app-tabs.*.tsx` files.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` across every touched file; `tsc --noEmit` stayed clean after.
+
+## Entry 65 — Link is no longer a required field when adding a custom meal
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "one more thing is let's remove the link from the required list when creating a meal."
+
+### What I built
+
+- **`add-meal.tsx`** — added `"link"` to `RequiredMealField`'s exclusions (alongside the existing `"allergens"`/`"image"`), and removed `link` from `requiredFieldValues`, so the form's "Add" button no longer stays disabled when the link field is empty. Relabeled it "Link (optional)" so it's clear at a glance. `Meal.link` itself stays typed as a plain (non-optional) `string` — an empty string was already the correct representation of "no link," since `meal/[name].tsx`'s "Open recipe" button already only renders `meal.link !== ""`, and `handleSubmit` already saved `link.trim()` regardless — nothing downstream needed to change.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Confirmed `meal/[name].tsx`'s recipe-link button was already correctly guarded against an empty link before this change, so no other file needed touching.
+
+## Entry 66 — Replaced the stock README with a real project one
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "I wan you to create a README.md that explains the concept of the application, the different libraries used (actually check if we still use those libraries still). A link to our setup Markdown. The way we handle storage in the application and the split between the Zustand and assyncStorage and why it is there. Then you go over the seperate pages and what they do."
+
+### What I built
+
+- **`README.md`** — fully replaced the unedited `create-expo-app` boilerplate (still referencing the removed `npm run reset-project` script and plain `expo start`) with a real project README:
+  - What the app actually does (goal + calorie margin vs. Apple Health burn, per-day comparison, History chart).
+  - A link to `PHYSICAL_DEVICE_SETUP.md` for the dev-client build process, rather than duplicating it.
+  - The `useAppState`/AsyncStorage split and *why* it exists — same reasoning as Entry 60 (four live, cross-screen fields in zustand+persist; `customMeals`/`lastAddedMealName` deliberately left on plain AsyncStorage since they're read in far fewer places and don't need reactive sync).
+  - A libraries section — cross-checked each entry against actual `src/` imports (`grep -rl "from \"<pkg>\""`) rather than just listing everything in `package.json`; left out packages with zero direct imports (peer deps of libraries above, or config-plugin-only entries like `expo-splash-screen`), with a note explaining why they're omitted despite being installed.
+  - A per-screen rundown (Home, Planner, History, Profile, Add Meal, meal detail modal) covering what each one actually does.
+
+### How I verified it
+
+- Grepped every dependency in `package.json` against `src/` import statements before writing the libraries section, rather than assuming from memory.
+- Confirmed the `PHYSICAL_DEVICE_SETUP.md` link target actually exists in the repo.

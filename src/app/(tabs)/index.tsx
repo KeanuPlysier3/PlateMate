@@ -24,7 +24,7 @@ const getUpcomingDates = (): Date[] => {
   const dates: Date[] = [];
   for (let i = 0; i < UPCOMING_DAYS_COUNT; i++) {
     const date = new Date(start);
-    date.setDate(date.getDate() + i); //we set the date by looking at the current date of date and addiing i to.
+    date.setDate(date.getDate() + i);
     dates.push(date);
   }
   return dates;
