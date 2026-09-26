@@ -1421,3 +1421,53 @@ What looked like a Pressable hit-testing bug (only a thin horizontal band at the
 - `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
 - `npx expo export --platform web` — built successfully with no errors across all routes.
 - Read `node_modules/react-native-calendars/src/calendar/index.js` directly to trace the actual gating logic before picking a fix, rather than guessing.
+
+## Entry 60 — Migrated plannedMeals/allergies/weightGoal/calorieMargin to a shared zustand store
+
+**Date:** 2026-09-25/26
+
+**Prompt given:**
+> "There recently was an anouncement that the application should use zustand for stateHandling across multiple stages." (pasted example from a "barista" reference app's `use-order-store.ts`) → "I think we can apply it with the personal settings and when the user plans a meal. Creating and adding new meals should stay and work with async.storage i think." → confirmed the combined-interface shape, then tackled it in three parts: "let's continue with the allergies", "let's movet to the weight goals" (plannedMeals having already been done first) — "This entire switch will all be one part in the devDiary."
+
+### Why
+
+`plannedMeals`, `allergies`, `weightGoal`, and `calorieMargin` were each independently re-fetched from AsyncStorage via a `useFocusEffect` in every screen that needed them (`Home`, `Planner`, `History`, `Profile`) — a hand-rolled, less-reliable version of shared reactive state, prone to exactly the kind of manual-resync bug already hit once with Planner's calendar dots. `customMeals`/`lastAddedMealName` deliberately stay on plain AsyncStorage — they're read in far fewer places and don't need cross-screen live sync.
+
+### What I built
+
+- **`src/hooks/use-appState.ts`** (new) — one `useAppState` store (`zustand`'s `create`, same shape/spirit as the barista app's `use-order-store.ts`) holding all four fields plus `planMeal`, `deletePlannedMeal`, `setAllergies`, `setWeightGoal`, `setCalorieMargin`, and `resetAppState`. Wrapped in `persist` (`zustand/middleware`) with `storage: createJSONStorage(() => AsyncStorage)` under one key (`"appState"`) — the barista store has no such middleware since its cart is intentionally ephemeral; ours needs to survive app restarts, so persistence was the one deliberate addition on top of the same core pattern.
+- **`planner.tsx`** — `plannedMeals` and `allergies` (`userAllergies`) now come from the store; `handlePlanMeal` calls `planMeal(dateKey, meal)` instead of its own `AsyncStorage.getItem`/`setItem` dance. Its remaining `useFocusEffect` only fetches `customMeals`/`lastAddedMealName` now.
+- **`(tabs)/index.tsx`** — same for `plannedMeals` (read) and `deletePlannedMeal` (the trash icon), plus `weightGoal`/`calorieMargin` selectors replacing their own fetch effect.
+- **`(tabs)/history.tsx`** — same three fields as selectors; added to its data-recompute effect's dependency array so a goal change or a newly-planned meal recomputes the chart/list immediately, not just on next focus.
+- **`profile.tsx`** — `allergies`/`weightGoal`/`calorieMargin` all read/written through the store; its own `useFocusEffect` is gone entirely (nothing left to fetch). Closed a wrinkle flagged during planning: `handleResetStorage`'s `AsyncStorage.clear()` wipes the *persisted* copy, but the store's *in-memory* state wouldn't otherwise reset until an app restart — `resetAppState()` (built from a shared `INITIAL_APP_STATE` constant) is now called right after, so the debug button actually clears everything it claims to, immediately.
+
+Net effect across the four files (`planner.tsx`, `index.tsx`, `history.tsx`, `profile.tsx`): **90 lines removed, 34 added** (per `git diff --stat` on the plannedMeals part alone) for behavior that's functionally identical — the payoff being one shared, always-current source of truth instead of four independently-fetched copies.
+
+### How I verified it
+
+- `tsc --noEmit` — clean after each of the three sub-parts (plannedMeals, allergies, weightGoal/calorieMargin), not just at the end.
+- `npx expo export --platform web` — built successfully after each part.
+- Ran `npx prettier --write` across all touched files.
+
+## Entry 61 — Redesigned Profile's Goal/Margin section (segmented control + Pace cards)
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "My teacher told me to improve on the ux of the weightgoal and the margin. They don't feel related to eachother and it's not entirely clear what the margin is either. I asked another claude for a redesign. I like the new version but... you should not pay attention to the daily target part just keep that apple health part we already have instead. Also the daily deficit should have the information icon that explains what it is." (two reference mockup screenshots showing a segmented Lose/Maintain/Gain control, a "Pace" section with Gentle/Moderate/Custom cards, and a daily-target summary card that was explicitly excluded) — confirmed presets stay identical for lose/gain, the 100–750 range is a recommendation only (not enforced), and to keep the last-typed custom value when switching pace cards.
+
+### What I built
+
+- **`profile.tsx`** — replaced the vertical `RadioGroup` (Lose/Maintain/Gain as a plain list) with a segmented 3-tab control matching the mockup, plus a helper line under it that changes with the selected goal ("Eat a little below/above/about the same as what you burn each day").
+- Added a **"Pace" section** (hidden entirely when goal is "Maintain," since a margin is meaningless then): Gentle (250 kcal/day) and Moderate (500 kcal/day) as fixed-value selectable cards with a rough "≈ kg/week" estimate label, and a Custom card that reveals the existing numeric input.
+- The 100–750 kcal range from the mockup is shown as plain hint text under the Custom input, not enforced/clamped — per instruction, it's a recommendation only.
+- **Keeping the last-typed custom value**: added `selectedPace` (which card is highlighted) and `customMarginText` (the Custom field's own draft text) as state local to `profile.tsx`, deliberately kept separate from the store's `calorieMargin` — picking Gentle/Moderate sets `calorieMargin` directly without touching `customMarginText`, so switching back to Custom restores whatever was last typed instead of resetting it. `selectedPace` initializes by checking whether the persisted `calorieMargin` matches a preset (`getPaceForMargin`), defaulting to "gentle" specifically when it's `0` (the untouched-since-install default), rather than showing "Custom" pre-filled with 0 for a brand new user.
+- Added the info icon next to "Daily deficit"/"Daily surplus" (label itself changes based on lose vs. gain) — tapping it shows an explanation via `Alert.alert`, the same lightweight pattern already used elsewhere in the app (e.g. `health-connection-status.ios.tsx`), rather than introducing a new tooltip/popover component just for this one case.
+- Explicitly did **not** build the mockup's "Your daily target" card (would need a maintenance-calorie/TDEE estimate this app doesn't compute) — the existing "Apple Health" section stays exactly as it was, untouched, immediately below.
+- Removed `react-native-radio-buttons-group` entirely (`npm uninstall`) — confirmed via grep it was only ever used in this one file, so nothing else in the codebase references it.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` afterward; `tsc --noEmit` stayed clean.

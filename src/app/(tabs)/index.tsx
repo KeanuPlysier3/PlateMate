@@ -9,19 +9,13 @@ import {
 } from "react-native";
 import { Link, useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import {
-  CALORIE_MARGIN_STORAGE_KEY,
-  PLANNED_MEALS_STORAGE_KEY,
-  WEIGHT_GOAL_STORAGE_KEY,
-} from "@/constants/storage";
 import { COLORS } from "@/constants/theme";
-import { getCalorieTip, type WeightGoal } from "@/utils/calorie-tips";
+import { useAppState } from "@/hooks/use-appState";
+import { getCalorieTip } from "@/utils/calorie-tips";
 import { getStartOfToday, toDateKey, formatDate } from "@/utils/date";
 import { getTodayBurnedCalories } from "@/utils/health";
 import { resolveMealImage } from "@/utils/resolve-meal-image";
-import type { PlannedMeals } from "@/types/planned-meal";
 
 const UPCOMING_DAYS_COUNT = 7; // today + the next 6
 
@@ -37,66 +31,11 @@ const getUpcomingDates = (): Date[] => {
 };
 
 export default function Home() {
-  const [plannedMeals, setPlannedMeals] = useState<PlannedMeals>({});
+  const plannedMeals = useAppState((state) => state.plannedMeals);
+  const deletePlannedMeal = useAppState((state) => state.deletePlannedMeal);
+  const weightGoal = useAppState((state) => state.weightGoal);
+  const calorieMargin = useAppState((state) => state.calorieMargin);
   const [burnedCalories, setBurnedCalories] = useState<number | null>(null);
-  const [weightGoal, setWeightGoal] = useState<WeightGoal>("maintain");
-  const [calorieMargin, setCalorieMargin] = useState(0);
-
-  // Re-reads on every focus (not just on mount) so a meal planned on the
-  // Planner tab shows up here as soon as you switch back to Home — same
-  // pattern as planner.tsx's own focus effect for customMeals.
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      (async () => {
-        const storedValue = await AsyncStorage.getItem(
-          PLANNED_MEALS_STORAGE_KEY,
-        );
-        const parsed: PlannedMeals = storedValue ? JSON.parse(storedValue) : {};
-        if (isActive) {
-          setPlannedMeals(parsed);
-        }
-      })();
-
-      return () => {
-        isActive = false;
-      };
-    }, []),
-  );
-
-  const handleDeletePlannedMeal = async (dateKey: string) => {
-    const updated = { ...plannedMeals };
-    delete updated[dateKey];
-    setPlannedMeals(updated);
-    await AsyncStorage.setItem(
-      PLANNED_MEALS_STORAGE_KEY,
-      JSON.stringify(updated),
-    );
-  };
-
-  // Re-reads the goal/margin set on Profile every time this screen gains
-  // focus, same reasoning as plannedMeals above.
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      (async () => {
-        const [storedGoal, storedMargin] = await Promise.all([
-          AsyncStorage.getItem(WEIGHT_GOAL_STORAGE_KEY),
-          AsyncStorage.getItem(CALORIE_MARGIN_STORAGE_KEY),
-        ]);
-        if (isActive) {
-          setWeightGoal((storedGoal as WeightGoal) ?? "maintain");
-          setCalorieMargin(storedMargin ? Number(storedMargin) : 0);
-        }
-      })();
-
-      return () => {
-        isActive = false;
-      };
-    }, []),
-  );
 
   // burned-calorie total changes constantly while the app is in the
   // background, so re-capture it on every focus too.
@@ -275,7 +214,7 @@ export default function Home() {
 
             {meal ? (
               <Pressable
-                onPress={() => handleDeletePlannedMeal(toDateKey(date))}
+                onPress={() => deletePlannedMeal(toDateKey(date))}
                 hitSlop={8}
               >
                 <SymbolView

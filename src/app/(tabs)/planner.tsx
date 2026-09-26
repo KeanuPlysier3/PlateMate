@@ -22,17 +22,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import mealsData from "@/data/meals.json";
 import {
-  ALLERGIES_STORAGE_KEY,
   CUSTOM_MEALS_STORAGE_KEY,
   LAST_ADDED_MEAL_STORAGE_KEY,
-  PLANNED_MEALS_STORAGE_KEY,
 } from "@/constants/storage";
 import { findMatchingAllergens, getAllergenLabel } from "@/constants/allergens";
 import { COLORS } from "@/constants/theme";
+import { useAppState } from "@/hooks/use-appState";
 import { resolveMealImage } from "@/utils/resolve-meal-image";
 import { toDateKey, getStartOfToday, formatDate } from "@/utils/date";
 import type { Meal } from "@/types/meal";
-import type { PlannedMeals } from "@/types/planned-meal";
 
 // Typing this assignment as Meal[] makes TypeScript check every entry in
 // meals.json against the Meal shape (name/allergens/ingredients/description/link/image)
@@ -48,8 +46,9 @@ export default function Planner() {
   const [meals, setMeals] = useState<Meal[]>(bundledMeals); //initialize meals state with bundledMeals
   const [isPlanningMeal, setIsPlanningMeal] = useState(false);
   const [showPlannedToast, setShowPlannedToast] = useState(false);
-  const [userAllergies, setUserAllergies] = useState<string[]>([]);
-  const [plannedMeals, setPlannedMeals] = useState<PlannedMeals>({});
+  const userAllergies = useAppState((state) => state.allergies);
+  const plannedMeals = useAppState((state) => state.plannedMeals);
+  const planMeal = useAppState((state) => state.planMeal);
   const insets = useSafeAreaInsets();
   const { date } = useLocalSearchParams<{ date?: string }>();
 
@@ -77,7 +76,7 @@ export default function Planner() {
     return () => clearTimeout(timeoutId);
   }, [showPlannedToast]);
 
-  //reread custom meals and user allergies from AsyncStorage whenever the planner screen is focused, so that the dropdown list of meals is always up to date
+  //reread custom meals from AsyncStorage whenever the planner screen is focused, so that the dropdown list of meals is always up to date
   useFocusEffect(
     useCallback(() => {
       //this prevents the useFocusEffect from being called multiple times when the component re-renders
@@ -90,7 +89,6 @@ export default function Planner() {
         const customMeals: Meal[] = storedValue ? JSON.parse(storedValue) : [];
         const allMeals = [...bundledMeals, ...customMeals];
         if (!isActive) {
-          //if the component is no longer active (unmounted), we don't want to update state
           return;
         }
         setMeals(allMeals);
@@ -107,13 +105,6 @@ export default function Planner() {
           }
           await AsyncStorage.removeItem(LAST_ADDED_MEAL_STORAGE_KEY);
         }
-
-        const storedAllergies = await AsyncStorage.getItem(
-          ALLERGIES_STORAGE_KEY,
-        );
-        if (isActive) {
-          setUserAllergies(storedAllergies ? JSON.parse(storedAllergies) : []);
-        }
       })();
 
       return () => {
@@ -121,33 +112,12 @@ export default function Planner() {
       };
     }, []),
   );
-
-  
-  // previously only ever wrote to this key, never read it.
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      (async () => {
-        const storedValue = await AsyncStorage.getItem(
-          PLANNED_MEALS_STORAGE_KEY,
-        );
-        if (isActive) {
-          setPlannedMeals(storedValue ? JSON.parse(storedValue) : {});
-        }
-      })();
-
-      return () => {
-        isActive = false;
-      };
-    }, []),
-  );
-
 
   const handleDayPress = (day: DateData) => {
     const pressedDate = new Date(day.year, day.month - 1, day.day); //js indexes months from 0, so we need to subtract 1 from the month value
 
-    if (pressedDate < getStartOfToday()) {//if the pressed date is in the past skip the dropdown step and go straight to the overview screen 
+    if (pressedDate < getStartOfToday()) {
+      //if the pressed date is in the past skip the dropdown step and go straight to the overview screen
       const pastMeal = plannedMeals[toDateKey(pressedDate)];
       if (pastMeal) {
         setSelectedDate(pressedDate);
@@ -172,16 +142,7 @@ export default function Planner() {
 
     setIsPlanningMeal(true);
     try {
-      const storedValue = await AsyncStorage.getItem(PLANNED_MEALS_STORAGE_KEY);
-      const updatedPlannedMeals: PlannedMeals = storedValue
-        ? JSON.parse(storedValue)
-        : {};
-      updatedPlannedMeals[toDateKey(selectedDate)] = selectedMeal; //overwrites any meal already planned for this date, by design — one meal per date
-      await AsyncStorage.setItem(
-        PLANNED_MEALS_STORAGE_KEY,
-        JSON.stringify(updatedPlannedMeals),
-      );
-      setPlannedMeals(updatedPlannedMeals);
+      planMeal(toDateKey(selectedDate), selectedMeal); //overwrites any meal already planned for this date, by design — one meal per date
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowPlannedToast(true);
@@ -338,7 +299,7 @@ export default function Planner() {
             <Calendar
               style={styles.calendar}
               minDate={toDateKey(getStartOfToday())} //disable all past dates
-        
+
               allowSelectionOutOfRange //allowSelectionOutOfRange is needed to allow tapping on past dates that have a planned meal, even though those past dates are outside the minDate range
               markedDates={{
                 [toDateKey(pendingDate)]: {
@@ -346,8 +307,8 @@ export default function Planner() {
                   selectedColor: ACCENT_COLOR,
                 },
                 ...Object.fromEntries(
-                  Object.keys(plannedMeals)//grabs all the date keys of plannedMeals, which are in the format YYYY-MM-DD
-                    .filter((dateKey) => dateKey < toDateKey(getStartOfToday()))//keep dates in the past
+                  Object.keys(plannedMeals) //grabs all the date keys of plannedMeals, which are in the format YYYY-MM-DD
+                    .filter((dateKey) => dateKey < toDateKey(getStartOfToday())) //keep dates in the past
                     .map((dateKey) => [
                       dateKey,
                       { marked: true, dotColor: COLORS.teal, disabled: false }, //remove disabled state, and adds dot.

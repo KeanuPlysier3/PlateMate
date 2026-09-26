@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   Pressable,
@@ -8,131 +8,124 @@ import {
   View,
   StyleSheet,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import RadioGroup, {
-  type RadioButtonProps,
-} from "react-native-radio-buttons-group";
 
-import {
-  ALLERGIES_STORAGE_KEY,
-  CALORIE_MARGIN_STORAGE_KEY,
-  WEIGHT_GOAL_STORAGE_KEY,
-} from "@/constants/storage";
 import { COMMON_ALLERGENS, getAllergenLabel } from "@/constants/allergens";
 import { COLORS } from "@/constants/theme";
+import { useAppState } from "@/hooks/use-appState";
+import type { WeightGoal } from "@/utils/calorie-tips";
 import HealthConnectionStatus from "@/components/health-connection-status";
 
-// containerStyle overrides the library's default marginHorizontal: 10 on
-// each row, so the whole group sits flush against the left edge instead of
-// with a small built-in indent.
-const WEIGHT_GOAL_OPTIONS: RadioButtonProps[] = [
-  {
-    id: "lose",
-    label: "Lose weight",
-    value: "lose",
-    containerStyle: { marginHorizontal: 0 },
-  },
-  {
-    id: "maintain",
-    label: "Maintain current weight",
-    value: "maintain",
-    containerStyle: { marginHorizontal: 0 },
-  },
-  {
-    id: "gain",
-    label: "Gain weight",
-    value: "gain",
-    containerStyle: { marginHorizontal: 0 },
-  },
+const WEIGHT_GOAL_OPTIONS: { id: WeightGoal; label: string }[] = [
+  { id: "lose", label: "Lose" },
+  { id: "maintain", label: "Maintain" },
+  { id: "gain", label: "Gain" },
 ];
+
+const GOAL_HELPER_TEXT: Record<WeightGoal, string> = {
+  lose: "Eat a little below what you burn each day.",
+  maintain: "Eat about the same as what you burn each day.",
+  gain: "Eat a little above what you burn each day.",
+};
+
+type Pace = "gentle" | "moderate" | "custom";
+
+// Fixed presets, same values regardless of lose vs. gain — only the sign
+// (deficit vs. surplus) differs, handled entirely in how they're displayed.
+const GENTLE_MARGIN = 250;
+const MODERATE_MARGIN = 500;
+
+const getPaceForMargin = (margin: number): Pace => {
+  if (margin === GENTLE_MARGIN) return "gentle";
+  if (margin === MODERATE_MARGIN) return "moderate";
+  return "custom";
+};
 
 export default function Profile() {
   // Common tags and custom-typed ones both live in this one flat list —
   // there's no meaningful difference between them once they're allergies
   // the user has, so one persisted array covers both instead of tracking
   // them as two separate pieces of state.
-  const [allergies, setAllergies] = useState<string[]>([]);
+  const allergies = useAppState((state) => state.allergies);
+  const setAllergies = useAppState((state) => state.setAllergies);
+  const weightGoal = useAppState((state) => state.weightGoal);
+  const setWeightGoal = useAppState((state) => state.setWeightGoal);
+  const calorieMargin = useAppState((state) => state.calorieMargin);
+  const setCalorieMargin = useAppState((state) => state.setCalorieMargin);
+  const resetAppState = useAppState((state) => state.resetAppState);
   const [customAllergen, setCustomAllergen] = useState("");
-  const [selectedWeightGoalId, setSelectedWeightGoalId] = useState("maintain");
-  const [calorieMargin, setCalorieMargin] = useState("0");
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      (async () => {
-        const storedAllergies = await AsyncStorage.getItem(
-          ALLERGIES_STORAGE_KEY,
-        );
-        const storedWeightGoal = await AsyncStorage.getItem(
-          WEIGHT_GOAL_STORAGE_KEY,
-        );
-        const storedCalorieMargin = await AsyncStorage.getItem(
-          CALORIE_MARGIN_STORAGE_KEY,
-        );
-
-        if (!isActive) {
-          return;
-        }
-        setAllergies(storedAllergies ? JSON.parse(storedAllergies) : []);
-        setSelectedWeightGoalId(storedWeightGoal ?? "maintain");
-        setCalorieMargin(storedCalorieMargin ?? "0");
-      })();
-
-      return () => {
-        isActive = false;
-      };
-    }, []),
+  const [selectedPace, setSelectedPace] = useState<Pace>(() =>
+    calorieMargin === 0 ? "gentle" : getPaceForMargin(calorieMargin),
   );
 
-  const persistAllergies = async (updated: string[]) => {
-    setAllergies(updated);
-    await AsyncStorage.setItem(ALLERGIES_STORAGE_KEY, JSON.stringify(updated));
-  };
+  const [customMarginText, setCustomMarginText] = useState(() =>
+    getPaceForMargin(calorieMargin) === "custom"
+      ? String(calorieMargin)
+      : "300",
+  );
 
   const toggleAllergen = (allergen: string) => {
     const updated = allergies.includes(allergen)
       ? allergies.filter((item) => item !== allergen)
       : [...allergies, allergen];
-    persistAllergies(updated);
+    setAllergies(updated);
   };
 
   const handleAddCustomAllergen = () => {
     const trimmed = customAllergen.trim();
     if (trimmed !== "" && !allergies.includes(trimmed)) {
-      persistAllergies([...allergies, trimmed]);
+      setAllergies([...allergies, trimmed]);
     }
     setCustomAllergen("");
   };
 
   const handleRemoveCustomAllergen = (allergen: string) => {
-    persistAllergies(allergies.filter((item) => item !== allergen));
+    setAllergies(allergies.filter((item) => item !== allergen));
   };
 
-  // react-native-radio-buttons-group's onPress hands back just the tapped
-  // id (RadioGroup is a controlled component — the selected item is driven
-  // by the separate `selectedId` prop, not baked into radioButtons itself).
-  const handleSelectWeightGoal = (id: string) => {
-    setSelectedWeightGoalId(id);
-    AsyncStorage.setItem(WEIGHT_GOAL_STORAGE_KEY, id);
 
-    // Selecting "keep current weight" forces the margin back to 0 and locks
-    // the field — a margin only means something when you're actively trying
-    // to lose or gain, per the request.
-    if (id === "maintain") {
-      setCalorieMargin("0");
-      AsyncStorage.setItem(CALORIE_MARGIN_STORAGE_KEY, "0");
+  const applyPace = (pace: Pace) => {
+    if (pace === "gentle") {
+      setCalorieMargin(GENTLE_MARGIN);
+    } else if (pace === "moderate") {
+      setCalorieMargin(MODERATE_MARGIN);
+    } else {
+      setCalorieMargin(Number(customMarginText) || 0);
     }
   };
 
-  const isMarginActive = selectedWeightGoalId !== "maintain";
+  const handleSelectWeightGoal = (id: WeightGoal) => {
+    setWeightGoal(id);
 
-  const handleChangeCalorieMargin = (text: string) => {
+    if (id === "maintain") {
+      setCalorieMargin(0);
+    } else {
+      applyPace(selectedPace);
+    }
+  };
+
+  const handleSelectPace = (pace: Pace) => {
+    setSelectedPace(pace);
+    applyPace(pace);
+  };
+
+  const handleChangeCustomMargin = (text: string) => {
     const sanitized = text.replace(/[^0-9]/g, "").replace(/^0+/, ""); //remove any non-digit characters and leading zeros
-    setCalorieMargin(sanitized);
-    AsyncStorage.setItem(CALORIE_MARGIN_STORAGE_KEY, sanitized);
+    setCustomMarginText(sanitized);
+    setCalorieMargin(Number(sanitized)); //Number("") is 0, so an emptied field correctly resolves to 0
+  };
+
+  const handleShowMarginInfo = () => {
+    Alert.alert(
+      weightGoal === "gain"
+        ? "What's a daily surplus?"
+        : "What's a daily deficit?",
+      weightGoal === "gain"
+        ? "This is how many calories above your maintenance level (what your body burns in a day) you aim to eat, to gain weight at a steady pace. A smaller surplus gains weight more slowly but is easier to sustain."
+        : "This is how many calories below your maintenance level (what your body burns in a day) you aim to eat, to lose weight at a steady pace. A smaller deficit loses weight more slowly but is easier to sustain.",
+    );
   };
 
   const handleResetStorage = () => {
@@ -146,6 +139,7 @@ export default function Profile() {
           style: "destructive",
           onPress: async () => {
             await AsyncStorage.clear();
+            resetAppState(); //AsyncStorage.clear() wipes the persisted copy, but the store's in-memory state needs its own reset too
             Alert.alert("Done", "All locally stored data has been cleared.");
           },
         },
@@ -214,32 +208,129 @@ export default function Profile() {
         </Pressable>
       </View>
 
-      <Text style={styles.sectionLabel}>Goal</Text>
-      <RadioGroup
-        radioButtons={WEIGHT_GOAL_OPTIONS}
-        onPress={handleSelectWeightGoal}
-        selectedId={selectedWeightGoalId}
-        layout="column"
-        containerStyle={styles.radioGroupContainer}
-      />
+      <Text style={styles.sectionLabel}>Your goal</Text>
+      <View style={styles.segmentedControl}>
+        {WEIGHT_GOAL_OPTIONS.map((option) => {
+          const isSelected = weightGoal === option.id;
+          return (
+            <Pressable
+              key={option.id}
+              style={[
+                styles.segmentedOption,
+                isSelected && styles.segmentedOptionSelected,
+              ]}
+              onPress={() => handleSelectWeightGoal(option.id)}
+            >
+              <Text
+                style={[
+                  styles.segmentedOptionText,
+                  isSelected && styles.segmentedOptionTextSelected,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={styles.goalHelperText}>{GOAL_HELPER_TEXT[weightGoal]}</Text>
 
-      <Text style={styles.sectionLabel}>Calorie margin (kcal per day)</Text>
-      <TextInput
-        style={[styles.input, !isMarginActive && styles.inputDisabled]}
-        placeholder="E.g. 500"
-        keyboardType="numeric"
-        value={calorieMargin}
-        onChangeText={handleChangeCalorieMargin}
-        editable={isMarginActive}
-      />
+      {weightGoal !== "maintain" && (
+        <>
+          <Text style={styles.sectionLabel}>Pace</Text>
+
+          {(["gentle", "moderate"] as const).map((pace) => {
+            const margin = pace === "gentle" ? GENTLE_MARGIN : MODERATE_MARGIN;
+            const weeklyKg = pace === "gentle" ? "0.25" : "0.45";
+            const sign = weightGoal === "gain" ? "+" : "-";
+            const isSelected = selectedPace === pace;
+            return (
+              <Pressable
+                key={pace}
+                style={[styles.paceCard, isSelected && styles.paceCardSelected]}
+                onPress={() => handleSelectPace(pace)}
+              >
+                <View
+                  style={[
+                    styles.paceRadioOuter,
+                    isSelected && styles.paceRadioOuterSelected,
+                  ]}
+                >
+                  {isSelected && <View style={styles.paceRadioInner} />}
+                </View>
+                <View style={styles.paceCardText}>
+                  <Text style={styles.paceCardTitle}>
+                    {pace === "gentle" ? "Gentle" : "Moderate"}
+                  </Text>
+                  <Text style={styles.paceCardSubtitle}>
+                    {sign}
+                    {margin} kcal/day · ≈ {weeklyKg} kg/week
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+
+          <Pressable
+            style={[
+              styles.paceCard,
+              selectedPace === "custom" && styles.paceCardSelected,
+            ]}
+            onPress={() => handleSelectPace("custom")}
+          >
+            <View
+              style={[
+                styles.paceRadioOuter,
+                selectedPace === "custom" && styles.paceRadioOuterSelected,
+              ]}
+            >
+              {selectedPace === "custom" && (
+                <View style={styles.paceRadioInner} />
+              )}
+            </View>
+            <View style={styles.paceCardText}>
+              <Text style={styles.paceCardTitle}>Custom</Text>
+              <Text style={styles.paceCardSubtitle}>Set your own amount</Text>
+            </View>
+          </Pressable>
+
+          {selectedPace === "custom" && (
+            <>
+              <View style={styles.marginLabelRow}>
+                <Text style={styles.marginLabelText}>
+                  Daily {weightGoal === "gain" ? "surplus" : "deficit"}
+                </Text>
+                <Pressable onPress={handleShowMarginInfo} hitSlop={8}>
+                  <SymbolView
+                    name={{
+                      ios: "info.circle",
+                      android: "info",
+                      web: "info",
+                    }}
+                    size={16}
+                    tintColor={COLORS.textMuted}
+                  />
+                </Pressable>
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="E.g. 500"
+                keyboardType="numeric"
+                value={customMarginText}
+                onChangeText={handleChangeCustomMargin}
+              />
+              <Text style={styles.marginHintText}>
+                Recommended: 100–750 kcal. Smaller changes are easier to keep
+                up.
+              </Text>
+            </>
+          )}
+        </>
+      )}
 
       <Text style={styles.sectionLabel}>Apple Health</Text>
       <HealthConnectionStatus />
 
-      {/* Debug tool: wipes AsyncStorage entirely (customMeals, plannedMeals,
-          lastAddedMealName). Useful whenever the Meal shape changes and
-          previously-saved data no longer matches it (e.g. missing calories
-          on meals saved before that field existed). */}
       <Pressable style={styles.resetButton} onPress={handleResetStorage}>
         <Text style={styles.resetButtonText}>Clear stored data (debug)</Text>
       </Pressable>
@@ -265,8 +356,96 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     color: COLORS.teal,
   },
-  radioGroupContainer: {
-    alignItems: "flex-start",
+  segmentedControl: {
+    flexDirection: "row",
+    backgroundColor: "#f2f2f5",
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
+  },
+  segmentedOption: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  segmentedOptionSelected: {
+    backgroundColor: COLORS.teal,
+  },
+  segmentedOptionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.teal,
+  },
+  segmentedOptionTextSelected: {
+    color: "#fff",
+  },
+  goalHelperText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginTop: 6,
+  },
+  paceCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 8,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  paceCardSelected: {
+    borderColor: COLORS.teal,
+    backgroundColor: "#f2f7f6",
+  },
+  paceRadioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#ccc",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  paceRadioOuterSelected: {
+    borderColor: COLORS.teal,
+  },
+  paceRadioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.teal,
+  },
+  paceCardText: {
+    flex: 1,
+    gap: 2,
+  },
+  paceCardTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+  paceCardSubtitle: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+  },
+  marginLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  marginLabelText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.teal,
+  },
+  marginHintText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 4,
   },
   tagRow: {
     flexDirection: "row",
@@ -331,10 +510,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-  },
-  inputDisabled: {
-    backgroundColor: "#f2f2f5",
-    color: "#aaa",
   },
   resetButton: {
     marginTop: 32,
