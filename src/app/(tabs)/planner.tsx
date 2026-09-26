@@ -7,7 +7,12 @@ import {
   Image,
   ScrollView,
 } from "react-native";
-import { Link, router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import {
+  Link,
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
+} from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Calendar, type DateData } from "react-native-calendars";
 import { Dropdown } from "react-native-element-dropdown";
@@ -15,42 +20,36 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import mealsData from "@/data/meals.json";
-import {
-  ALLERGIES_STORAGE_KEY,
-  CUSTOM_MEALS_STORAGE_KEY,
-  LAST_ADDED_MEAL_STORAGE_KEY,
-  PLANNED_MEALS_STORAGE_KEY,
-} from "@/constants/storage";
-import { findMatchingAllergens, getAllergenLabel } from "@/constants/allergens";
+import { LAST_ADDED_MEAL_STORAGE_KEY } from "@/constants/storage";
+import { findMatchingAllergens, getAllergenLabel } from "@/utils/allergens";
 import { COLORS } from "@/constants/theme";
+import { useAppState } from "@/hooks/use-appState";
+import { bundledMeals, getAllMeals } from "@/utils/meals";
 import { resolveMealImage } from "@/utils/resolve-meal-image";
 import { toDateKey, getStartOfToday, formatDate } from "@/utils/date";
 import type { Meal } from "@/types/meal";
-import type { PlannedMeals } from "@/types/planned-meal";
-
-// Typing this assignment as Meal[] makes TypeScript check every entry in
-// meals.json against the Meal shape (name/allergens/ingredients/description/link/image)
-// at compile time — a structurally invalid meal fails the build, not runtime.
-const bundledMeals: Meal[] = mealsData.meals;
 
 const ACCENT_COLOR = COLORS.orange;
 
 export default function Planner() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [pendingDate, setPendingDate] = useState<Date>(getStartOfToday); //initialize pendingDate to the start of today
+  const [pendingDate, setPendingDate] = useState<Date>(getStartOfToday);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
-  const [meals, setMeals] = useState<Meal[]>(bundledMeals); //initialize meals state with bundledMeals
+  const [meals, setMeals] = useState<Meal[]>(bundledMeals);
   const [isPlanningMeal, setIsPlanningMeal] = useState(false);
   const [showPlannedToast, setShowPlannedToast] = useState(false);
-  const [userAllergies, setUserAllergies] = useState<string[]>([]);
+  const userAllergies = useAppState((state) => state.allergies);
+  const plannedMeals = useAppState((state) => state.plannedMeals);
+  const planMeal = useAppState((state) => state.planMeal);
   const insets = useSafeAreaInsets();
   const { date } = useLocalSearchParams<{ date?: string }>();
 
-  // Set only when arriving via a day card's "+" button on Home (see its
-  // Link to `/planner?date=...`). Jumps straight past the calendar into
-  // meal-picking for that date, then clears the param so it doesn't keep
-  // re-forcing this date on a later, ordinary visit to the Planner tab.
+  // Viewing a past date's already-planned meal (see handleDayPress) skips
+  // straight to the overview screen with no dropdown step, since a past
+  // day's meal is a fixed historical record, not something to pick.
+  const isPastDate = selectedDate !== null && selectedDate < getStartOfToday();
+
+  // Reset search params after reading them, so that if the user navigates back to this
   useFocusEffect(
     useCallback(() => {
       if (date) {
@@ -60,35 +59,24 @@ export default function Planner() {
     }, [date]),
   );
 
-  // Auto-dismiss the "planned" toast after 3 seconds. Re-runs whenever
-  // showPlannedToast changes, so planning a second meal while the first
-  // toast is still visible restarts the 3-second window instead of the two
-  // timers fighting each other.
+  // toast auto-dismisses after 3 seconds, so we don't need to manually dismiss it
   useEffect(() => {
     if (!showPlannedToast) {
       return;
     }
-    const timeoutId = setTimeout(() => setShowPlannedToast(false), 3000); //dismiss after 3 seconds
+    const timeoutId = setTimeout(() => setShowPlannedToast(false), 3000);
     return () => clearTimeout(timeoutId);
   }, [showPlannedToast]);
 
-  // Re-reads AsyncStorage every time this screen gains focus (not just once
-  // on mount) so a meal added via the add-meal modal shows up in the
-  // dropdown as soon as you navigate back to Planner, without needing to
-  // restart the app — the tab screen itself stays mounted the whole time,
+  //reread custom meals from AsyncStorage whenever the planner screen is focused, so that the dropdown list of meals is always up to date
   useFocusEffect(
     useCallback(() => {
-      //this prevents the useFocusEffect from being called multiple times when the component re-renders
+      // guards against duplicate focus-effect runs
       let isActive = true;
 
       (async () => {
-        const storedValue = await AsyncStorage.getItem(
-          CUSTOM_MEALS_STORAGE_KEY,
-        ); //storedValue is a stringified JSON array of custom meals, or null if no custom meals have been added yet
-        const customMeals: Meal[] = storedValue ? JSON.parse(storedValue) : [];
-        const allMeals = [...bundledMeals, ...customMeals];
+        const allMeals = await getAllMeals();
         if (!isActive) {
-          //if the component is no longer active (unmounted), we don't want to update state
           return;
         }
         setMeals(allMeals);
@@ -105,13 +93,6 @@ export default function Planner() {
           }
           await AsyncStorage.removeItem(LAST_ADDED_MEAL_STORAGE_KEY);
         }
-
-        const storedAllergies = await AsyncStorage.getItem(
-          ALLERGIES_STORAGE_KEY,
-        );
-        if (isActive) {
-          setUserAllergies(storedAllergies ? JSON.parse(storedAllergies) : []);
-        }
       })();
 
       return () => {
@@ -121,7 +102,19 @@ export default function Planner() {
   );
 
   const handleDayPress = (day: DateData) => {
-    setPendingDate(new Date(day.year, day.month - 1, day.day)); //js indexes months from 0, so we need to subtract 1 from the month value
+    const pressedDate = new Date(day.year, day.month - 1, day.day); // JS months are 0-indexed
+
+    if (pressedDate < getStartOfToday()) {
+      //if the pressed date is in the past skip the dropdown step and go straight to the overview screen
+      const pastMeal = plannedMeals[toDateKey(pressedDate)];
+      if (pastMeal) {
+        setSelectedDate(pressedDate);
+        setSelectedMeal(pastMeal);
+      }
+      return;
+    }
+
+    setPendingDate(pressedDate);
   };
 
   const handleReset = () => {
@@ -137,15 +130,7 @@ export default function Planner() {
 
     setIsPlanningMeal(true);
     try {
-      const storedValue = await AsyncStorage.getItem(PLANNED_MEALS_STORAGE_KEY);
-      const plannedMeals: PlannedMeals = storedValue
-        ? JSON.parse(storedValue)
-        : {};
-      plannedMeals[toDateKey(selectedDate)] = selectedMeal; //overwrites any meal already planned for this date, by design — one meal per date
-      await AsyncStorage.setItem(
-        PLANNED_MEALS_STORAGE_KEY,
-        JSON.stringify(plannedMeals),
-      );
+      planMeal(toDateKey(selectedDate), selectedMeal); //overwrites any meal already planned for this date, by design — one meal per date
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowPlannedToast(true);
@@ -173,7 +158,8 @@ export default function Planner() {
             <>
               <Pressable
                 style={styles.backButton}
-                onPress={() => setSelectedMeal(null)}
+
+                onPress={isPastDate ? handleReset : () => setSelectedMeal(null)}
                 hitSlop={8}
               >
                 <SymbolView
@@ -234,15 +220,18 @@ export default function Planner() {
               <Pressable
                 style={[
                   styles.planMealButton,
-                  isPlanningMeal && styles.planMealButtonDisabled,
+                  (isPlanningMeal || isPastDate) &&
+                    styles.planMealButtonDisabled,
                 ]}
                 onPress={handlePlanMeal}
-                disabled={isPlanningMeal}
+                disabled={isPlanningMeal || isPastDate}
               >
                 <Text style={styles.planMealButtonText}>
-                  {isPlanningMeal
-                    ? "Planning..."
-                    : `Plan meal on ${formatDate(selectedDate)}`}
+                  {isPastDate
+                    ? "This date has already passed"
+                    : isPlanningMeal
+                      ? "Planning..."
+                      : `Plan meal on ${formatDate(selectedDate)}`}
                 </Text>
               </Pressable>
             </>
@@ -297,12 +286,22 @@ export default function Planner() {
           <>
             <Calendar
               style={styles.calendar}
-              minDate={toDateKey(getStartOfToday())} //todatekey is used to format the date to the format that the calendar component expects
+              minDate={toDateKey(getStartOfToday())} //disable all past dates
+
+              allowSelectionOutOfRange //allowSelectionOutOfRange is needed to allow tapping on past dates that have a planned meal, even though those past dates are outside the minDate range
               markedDates={{
                 [toDateKey(pendingDate)]: {
                   selected: true,
                   selectedColor: ACCENT_COLOR,
                 },
+                ...Object.fromEntries(
+                  Object.keys(plannedMeals) //grabs all the date keys of plannedMeals, which are in the format YYYY-MM-DD
+                    .filter((dateKey) => dateKey < toDateKey(getStartOfToday())) //keep dates in the past
+                    .map((dateKey) => [
+                      dateKey,
+                      { marked: true, dotColor: COLORS.teal, disabled: false }, //remove disabled state, and adds dot.
+                    ]),
+                ),
               }}
               theme={{
                 todayTextColor: ACCENT_COLOR,

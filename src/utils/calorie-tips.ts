@@ -30,7 +30,6 @@ export function getCalorieTip(
     return `You need ${Math.max(0, Math.round(-remaining))} kcal more today to hit your surplus goal try eating a bit more.`;
   }
 
-  // maintain
   const offBalance = Math.abs(currentDifference);
   if (offBalance <= 100) {
     return "You're keeping your calories nicely balanced today.";

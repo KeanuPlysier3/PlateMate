@@ -18,11 +18,12 @@ import {
 import { COLORS } from "@/constants/theme";
 import type { Meal } from "@/types/meal";
 
-// Every Meal field is required to fill in the form EXCEPT allergens and image
-// (allergens can be empty, image falls back to a placeholder) — deriving this
-// list from `keyof Meal` means a future change to the Meal shape that isn't
-// reflected here fails the type check below, instead of silently going stale.
-type RequiredMealField = Exclude<keyof Meal, "allergens" | "image">;
+// Every Meal field is required to fill in the form EXCEPT allergens, image,
+// and link (allergens/link can be empty, image falls back to a placeholder)
+// — deriving this list from `keyof Meal` means a future change to the Meal
+// shape that isn't reflected here fails the type check below, instead of
+// silently going stale.
+type RequiredMealField = Exclude<keyof Meal, "allergens" | "image" | "link">;
 
 // Bundled fallback used when the user doesn't pick a photo. Stored the same
 // way the 45 seeded meals store their images: a path relative to `@/assets/`.
@@ -31,8 +32,8 @@ const PLACEHOLDER_IMAGE = "images/meal-placeholder.png";
 const splitCommaList = (value: string): string[] =>
   value
     .split(",")
-    .map((item) => item.trim()) //no whitespace
-    .filter((item) => item !== ""); //remove empty strings
+    .map((item) => item.trim())
+    .filter((item) => item !== "");
 
 export default function AddMeal() {
   const [name, setName] = useState("");
@@ -50,7 +51,6 @@ export default function AddMeal() {
     ingredients,
     description,
     calories,
-    link,
   };
 
   const areRequiredFieldsFilled = Object.values(requiredFieldValues).every(
@@ -99,7 +99,7 @@ export default function AddMeal() {
         "Something went wrong while saving the meal. Please try again.",
       );
     } finally {
-      //even if the save fails, we want to reset the saving state so the user can try again
+      // reset even on failure so the user can retry
       setIsSaving(false);
     }
   };
@@ -148,7 +148,7 @@ export default function AddMeal() {
         onChangeText={setCalories}
       />
 
-      <Text style={styles.label}>Link</Text>
+      <Text style={styles.label}>Link (optional)</Text>
       <TextInput
         style={styles.input}
         placeholder="https://..."

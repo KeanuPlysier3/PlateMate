@@ -15,7 +15,7 @@ export default function AppTabs() {
           <Text>Planner</Text>
         </TabTrigger>
         <TabTrigger name="history" href="/history" style={styles.tabTrigger}>
-          <Text>Historie</Text>
+          <Text>History</Text>
         </TabTrigger>
       </TabList>
     </Tabs>

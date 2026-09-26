@@ -9,9 +9,9 @@ import { mealImageMap } from "@/constants/meal-images";
 // always use the placeholder, since image picking is native-only) that needs
 // the static require() map instead.
 export function resolveMealImage(image: string): ImageSourcePropType {
-  if (image.startsWith("file://")) { //custom meal image picked by user, on native
+  if (image.startsWith("file://")) {
     return { uri: image };
   }
 
-  return mealImageMap[image] ?? mealImageMap["images/meal-placeholder.png"];//default meal or placeholder if the image path is not found in the map
+  return mealImageMap[image] ?? mealImageMap["images/meal-placeholder.png"];
 }

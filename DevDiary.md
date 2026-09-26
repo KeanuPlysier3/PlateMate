@@ -1290,3 +1290,310 @@ Two separate issues came up back to back:
 
 - `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
 - `npx expo export --platform web` — built successfully with no errors across all routes.
+
+## Entry 53 — Home's meal cards open a full-detail modal via a dynamic route
+
+**Date:** 2026-09-24
+
+**Prompt given:**
+> "alright every card inside of the home menu will be able to be pressed. When you press it you open a dynamic route. This route leads to a modal that simply displays the entire meal, and all of it's data. The route simply uses the name of the meal it'selfs inside the dynamic route we grab that searchParam and look for it in the combined array of custom and native meals similar as we did with the dropdown."
+(delivering on the "later we will have a detail page" note from the earlier day-card/trash-icon work)
+
+### What I built
+
+- **`src/app/meal/[name].tsx`** — new dynamic route. Reads the `name` param via `useLocalSearchParams`, then — same lookup Planner already does for its dropdown — combines the bundled `meals.json` with `CUSTOM_MEALS_STORAGE_KEY`'s custom meals and finds the one whose `name` matches. Renders the full detail: image, calories, description, an allergy warning banner (reusing `findMatchingAllergens`/`getAllergenLabel` against the user's stored allergies) if applicable, ingredients, allergens, and the recipe link. Shows a plain "Meal not found" fallback if nothing matches (e.g. a stale link to a deleted custom meal).
+- **`_layout.tsx`** — registered `meal/[name]` as a modal `Stack.Screen`, same presentation as `profile`/`add-meal`.
+- **`(tabs)/index.tsx`** — wrapped the meal-bearing parts of both the "Today" card (image + name) and each upcoming day's card (`dayCardInfo`) in a `Link` to `{ pathname: "/meal/[name]", params: { name: meal.name } }`, but only when that day actually has a planned meal — a day with nothing planned yet has no detail to show, so it stays a plain, non-pressable `Text`. The day cards' existing `+`/trash icon on the right is untouched, since it's a separate `Pressable` outside the now-linked info section.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully; confirmed `/meal/[name]` appears in the exported route list.
+
+## Entry 54 — Fixed Home's "Today" card tap target, then restyled the meal detail modal
+
+**Date:** 2026-09-24
+
+**Prompt given:**
+> "You simply do not put the entire card inside the pressable. The stats row etc and tip are also part of that card remember" — followed by: "yes ok, now update the UI of that dynamic route so that it looks a bit better and more realistic rather than boring text with a title."
+
+### The tap-target bug
+
+What looked like a Pressable hit-testing bug (only a thin horizontal band at the card's vertical center responded to taps, any x) was never actually a bug — it was scope. Entry 53 had only wrapped the meal image + name in the `Link`/`Pressable`, not the whole card; that small wrapped region just happened to sit near the vertical middle of the much taller full card, which is exactly the band that responded. Restructured `(tabs)/index.tsx` so the entire "Today" card's content (label, date, image/name, stats row, tip) is built once as `focusCardContent`, then that same content is rendered inside either a `Pressable`/`Link` (when `todayMeal` exists) or a plain `View` (when it doesn't) — so the *whole* card, not a sub-region, is the tap target now.
+
+### Meal detail modal restyle
+
+`meal/[name].tsx` was plain stacked `Text` elements with section labels — functional but exactly the "boring text with a title" described. Restyled to match the wireframe's recipe-detail look:
+- Full-bleed image at the top (edge-to-edge, no padding) with a floating orange calorie badge (flame icon + kcal) overlaid on its bottom-right corner, rather than calories being just another line of text.
+- Ingredients and allergens now render as chip/tag rows (same rounded-pill visual language as Profile's allergy tags) instead of a single comma-joined sentence — allergen chips specifically reuse the same amber warning color as the allergy banner, so allergens read as "caution-colored" at a glance even outside the banner.
+- The recipe link is now a real bordered button ("Open recipe") that calls `Linking.openURL(meal.link)` on press, instead of just displaying the raw URL as unclickable text.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+
+## Entry 55 — Planner's calendar can look back at already-planned past dates
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "Is it possible to make it so that you can click on previous dates that were in the plannedMeals asyncStorage key, and also put them on the calendar. This allows them to click on the meal and see an overview but it disables the plann this meal button since it is in the past?" — confirmed with "ok let's try it" after I laid out the implementation plan first.
+
+### What I built
+
+- **`(tabs)/planner.tsx`** now reads `PLANNED_MEALS_STORAGE_KEY` into local state (it previously only ever *wrote* to it) — same `useFocusEffect` pattern already used for `customMeals`/allergies here and for `plannedMeals` on Home/History.
+- Removed the calendar's `minDate` (which blocked every past day outright) and instead mark past dates that actually have a planned meal with a small teal dot (`markedDates`), built from `Object.keys(plannedMeals)` filtered to date-keys before today — comparing the `"YYYY-MM-DD"` strings directly rather than parsing them back into `Date`s, since that format sorts correctly as plain strings and avoids any timezone-parsing footguns.
+- **`handleDayPress`** now branches: a past date with a planned meal jumps straight to the overview screen (`setSelectedDate` + `setSelectedMeal` together, skipping the dropdown step entirely — a past day's meal is a fixed record, not something to pick). A past date with nothing planned does nothing. Today/future dates keep the exact same pendingDate → Confirm → dropdown flow as before.
+- Added `isPastDate` (`selectedDate < getStartOfToday()`). On the overview screen: the "Plan meal on ..." button stays visible but is disabled and relabeled "This date has already passed" when `isPastDate` (reusing the existing disabled visual style, not inventing a new one) — matching "disables the button" rather than hiding it. The back chevron calls `handleReset()` (straight to the calendar) instead of `setSelectedMeal(null)` (the dropdown screen) for a past date, since that dropdown step never happened for it in the first place.
+- **`handlePlanMeal`** also now calls `setPlannedMeals(...)` after a successful save, so the calendar's dots reflect a just-planned meal immediately without needing to leave and refocus the tab. Renamed its local `plannedMeals` variable to `updatedPlannedMeals` to avoid shadowing the new state.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` on the file afterward to clean up indentation from the edits; `tsc --noEmit` stayed clean after.
+
+## Entry 56 — Empty past days on the calendar are now visibly greyed out
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "Ok but if a date does not have a planned meal, it should just be greyed out"
+
+### What I built
+
+- **`(tabs)/planner.tsx`** — added `PAST_GREYOUT_DAYS = 90` and a `pastEmptyDayMarks` loop that marks every day in that window without a `plannedMeals` entry as `{ disabled: true, disableTouchEvent: true }` in the calendar's `markedDates`, merged alongside the existing teal-dot marks for past days that *do* have a meal. Also added `disableAllTouchEventsForDisabledDays` on the `Calendar` itself as a second layer of protection against `onDayPress` firing for a greyed day.
+- This can't cover literally every day since the beginning of time — `react-native-calendars` needs one real `markedDates` entry per day to style it, so an unbounded loop isn't practical. 90 days is a reasonable bound for realistic use; anything older just renders unmarked (normal-looking) rather than grey, though tapping it is still a safe no-op either way since `handleDayPress` checks `plannedMeals` directly, independent of this greyout window.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` afterward; `tsc --noEmit` stayed clean.
+
+## Entry 57 — Reverted the past-days greyout from Entry 56
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "remove that change" (referring to Entry 56's `pastEmptyDayMarks` greyout)
+
+### What I built
+
+- **`(tabs)/planner.tsx`** — removed `PAST_GREYOUT_DAYS`, the `pastEmptyDayMarks` loop, and `disableAllTouchEventsForDisabledDays`, restoring the calendar to Entry 55's behavior: past dates with a planned meal still show a teal dot and are tappable; empty past dates render unmarked (not greyed) but are still a no-op when tapped, since `handleDayPress` checks `plannedMeals` directly regardless of any visual marking.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+
+## Entry 58 — Unbounded past-day greyout, without looping over calendar days
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "disabledByDefault for every date before today" (following a discussion about `disabledByDefault` disabling future dates too, which isn't wanted)
+
+### What I built
+
+- **`(tabs)/planner.tsx`** — restored `minDate={toDateKey(getStartOfToday())}` on the `Calendar`, which disables every day before today automatically and unboundedly (react-native-calendars' own range check), unlike Entry 56's bounded 90-day loop. Added `disabled: false` to the existing per-day `markedDates` entry for past dates that have a planned meal — read the library's source (`calendar/day/basic/index.js`) to confirm a day's own `marking.disabled` is checked before falling back to the `minDate`-computed disabled state, so this explicit override re-enables exactly those specific days without needing to enumerate anything. Net result: unbounded past-day disabling with no loop, only iterating over `Object.keys(plannedMeals)` (already small and bounded by however many meals actually exist) to punch through the few exceptions.
+- Deliberately did *not* use the `disabledByDefault` prop itself — checked its implementation and it disables every day including future ones, which would require enumerating and re-enabling an even larger, still-unbounded set (every future date someone might plan into) — worse than the problem it was meant to solve.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Read `node_modules/react-native-calendars/src/day-state-manager.js` and `calendar/day/basic/index.js` directly to confirm the disabled-state override behavior before relying on it, rather than assuming.
+
+## Entry 59 — Fixed past dates not actually responding to taps
+
+**Date:** 2026-09-25
+
+**Prompt given:**
+> "clicking on those past days that have a meal does not do anything"
+
+### What I built
+
+- **`(tabs)/planner.tsx`** — added `allowSelectionOutOfRange` to the `Calendar`. Read `react-native-calendars`' source (`calendar/index.js`'s `handleDayInteraction`) to find the real cause: `onDayPress` is gated purely on `minDate`/`maxDate` at the `Calendar` level, with zero awareness of any per-day `markedDates.disabled` override — so a past date's `disabled: false` override (Entry 58) correctly made it *look* enabled, but its tap was still silently swallowed before `onDayPress` ever fired. `allowSelectionOutOfRange` bypasses that gate so every tap reaches `handleDayPress`, which already re-implements the real "does this do anything" decision itself (opens the meal if one's planned for that date, no-ops otherwise) — so this is safe: the greyed-out look for past dates *without* an override still comes entirely from `minDate`'s styling, untouched by this change.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Read `node_modules/react-native-calendars/src/calendar/index.js` directly to trace the actual gating logic before picking a fix, rather than guessing.
+
+## Entry 60 — Migrated plannedMeals/allergies/weightGoal/calorieMargin to a shared zustand store
+
+**Date:** 2026-09-25/26
+
+**Prompt given:**
+> "There recently was an anouncement that the application should use zustand for stateHandling across multiple stages." (pasted example from a "barista" reference app's `use-order-store.ts`) → "I think we can apply it with the personal settings and when the user plans a meal. Creating and adding new meals should stay and work with async.storage i think." → confirmed the combined-interface shape, then tackled it in three parts: "let's continue with the allergies", "let's movet to the weight goals" (plannedMeals having already been done first) — "This entire switch will all be one part in the devDiary."
+
+### Why
+
+`plannedMeals`, `allergies`, `weightGoal`, and `calorieMargin` were each independently re-fetched from AsyncStorage via a `useFocusEffect` in every screen that needed them (`Home`, `Planner`, `History`, `Profile`) — a hand-rolled, less-reliable version of shared reactive state, prone to exactly the kind of manual-resync bug already hit once with Planner's calendar dots. `customMeals`/`lastAddedMealName` deliberately stay on plain AsyncStorage — they're read in far fewer places and don't need cross-screen live sync.
+
+### What I built
+
+- **`src/hooks/use-appState.ts`** (new) — one `useAppState` store (`zustand`'s `create`, same shape/spirit as the barista app's `use-order-store.ts`) holding all four fields plus `planMeal`, `deletePlannedMeal`, `setAllergies`, `setWeightGoal`, `setCalorieMargin`, and `resetAppState`. Wrapped in `persist` (`zustand/middleware`) with `storage: createJSONStorage(() => AsyncStorage)` under one key (`"appState"`) — the barista store has no such middleware since its cart is intentionally ephemeral; ours needs to survive app restarts, so persistence was the one deliberate addition on top of the same core pattern.
+- **`planner.tsx`** — `plannedMeals` and `allergies` (`userAllergies`) now come from the store; `handlePlanMeal` calls `planMeal(dateKey, meal)` instead of its own `AsyncStorage.getItem`/`setItem` dance. Its remaining `useFocusEffect` only fetches `customMeals`/`lastAddedMealName` now.
+- **`(tabs)/index.tsx`** — same for `plannedMeals` (read) and `deletePlannedMeal` (the trash icon), plus `weightGoal`/`calorieMargin` selectors replacing their own fetch effect.
+- **`(tabs)/history.tsx`** — same three fields as selectors; added to its data-recompute effect's dependency array so a goal change or a newly-planned meal recomputes the chart/list immediately, not just on next focus.
+- **`profile.tsx`** — `allergies`/`weightGoal`/`calorieMargin` all read/written through the store; its own `useFocusEffect` is gone entirely (nothing left to fetch). Closed a wrinkle flagged during planning: `handleResetStorage`'s `AsyncStorage.clear()` wipes the *persisted* copy, but the store's *in-memory* state wouldn't otherwise reset until an app restart — `resetAppState()` (built from a shared `INITIAL_APP_STATE` constant) is now called right after, so the debug button actually clears everything it claims to, immediately.
+
+Net effect across the four files (`planner.tsx`, `index.tsx`, `history.tsx`, `profile.tsx`): **90 lines removed, 34 added** (per `git diff --stat` on the plannedMeals part alone) for behavior that's functionally identical — the payoff being one shared, always-current source of truth instead of four independently-fetched copies.
+
+### How I verified it
+
+- `tsc --noEmit` — clean after each of the three sub-parts (plannedMeals, allergies, weightGoal/calorieMargin), not just at the end.
+- `npx expo export --platform web` — built successfully after each part.
+- Ran `npx prettier --write` across all touched files.
+
+## Entry 61 — Redesigned Profile's Goal/Margin section (segmented control + Pace cards)
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "My teacher told me to improve on the ux of the weightgoal and the margin. They don't feel related to eachother and it's not entirely clear what the margin is either. I asked another claude for a redesign. I like the new version but... you should not pay attention to the daily target part just keep that apple health part we already have instead. Also the daily deficit should have the information icon that explains what it is." (two reference mockup screenshots showing a segmented Lose/Maintain/Gain control, a "Pace" section with Gentle/Moderate/Custom cards, and a daily-target summary card that was explicitly excluded) — confirmed presets stay identical for lose/gain, the 100–750 range is a recommendation only (not enforced), and to keep the last-typed custom value when switching pace cards.
+
+### What I built
+
+- **`profile.tsx`** — replaced the vertical `RadioGroup` (Lose/Maintain/Gain as a plain list) with a segmented 3-tab control matching the mockup, plus a helper line under it that changes with the selected goal ("Eat a little below/above/about the same as what you burn each day").
+- Added a **"Pace" section** (hidden entirely when goal is "Maintain," since a margin is meaningless then): Gentle (250 kcal/day) and Moderate (500 kcal/day) as fixed-value selectable cards with a rough "≈ kg/week" estimate label, and a Custom card that reveals the existing numeric input.
+- The 100–750 kcal range from the mockup is shown as plain hint text under the Custom input, not enforced/clamped — per instruction, it's a recommendation only.
+- **Keeping the last-typed custom value**: added `selectedPace` (which card is highlighted) and `customMarginText` (the Custom field's own draft text) as state local to `profile.tsx`, deliberately kept separate from the store's `calorieMargin` — picking Gentle/Moderate sets `calorieMargin` directly without touching `customMarginText`, so switching back to Custom restores whatever was last typed instead of resetting it. `selectedPace` initializes by checking whether the persisted `calorieMargin` matches a preset (`getPaceForMargin`), defaulting to "gentle" specifically when it's `0` (the untouched-since-install default), rather than showing "Custom" pre-filled with 0 for a brand new user.
+- Added the info icon next to "Daily deficit"/"Daily surplus" (label itself changes based on lose vs. gain) — tapping it shows an explanation via `Alert.alert`, the same lightweight pattern already used elsewhere in the app (e.g. `health-connection-status.ios.tsx`), rather than introducing a new tooltip/popover component just for this one case.
+- Explicitly did **not** build the mockup's "Your daily target" card (would need a maintenance-calorie/TDEE estimate this app doesn't compute) — the existing "Apple Health" section stays exactly as it was, untouched, immediately below.
+- Removed `react-native-radio-buttons-group` entirely (`npm uninstall`) — confirmed via grep it was only ever used in this one file, so nothing else in the codebase references it.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` afterward; `tsc --noEmit` stayed clean.
+
+## Entry 62 — Codebase audit: fixed a real allergy-warning bug, removed dead code, condensed comments
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "Check the enitre code base for dead code, Summarise large blocks of comments into one line, only keep comments where needed. report back on all dead code you found." — delegated the read-only audit to a subagent, reviewed its report, then: "go ahead" to act on it.
+
+### What the audit found
+
+- **A real bug, not just dead code**: `meal/[name].tsx` still read the user's allergies via `AsyncStorage.getItem(ALLERGIES_STORAGE_KEY)`, a leftover from before the Entry-60 zustand migration. Since `profile.tsx` writes allergies exclusively through `useAppState` now (persisted under the `"appState"` key), that raw `"allergies"` key was never written anymore — the meal-detail modal's allergy-warning banner was silently always computing against an empty array, meaning it could never actually warn about anything, even though the identical banner on Planner (already on `useAppState`) worked correctly.
+- Three more storage-key exports (`PLANNED_MEALS_STORAGE_KEY`, `WEIGHT_GOAL_STORAGE_KEY`, `CALORIE_MARGIN_STORAGE_KEY`) fully dead for the same reason — exported, never imported anywhere post-migration.
+- `meal/[name].tsx` duplicated the "merge bundled `meals.json` + custom meals from AsyncStorage" logic already in `planner.tsx`, inline, independently.
+- `package.json`'s `"reset-project"` script pointed at a `scripts/reset-project.js` that doesn't exist at the project root (only under `example/`) — broken.
+- A handful of comments that just restated the line right next to them, one with a typo ("yr", "of the").
+- Several npm dependencies that grep across `src/` never imports by name (`@expo/ui`, `expo-device`, `expo-glass-effect`, `expo-linking`, `expo-status-bar`, `expo-system-ui`, `expo-web-browser`, plus some likely peer-deps of native modules already relied on).
+
+### What I built
+
+- **`src/utils/meals.ts`** (new) — `bundledMeals` + `getAllMeals()`, factored out of `planner.tsx`'s inline version, now shared by both `planner.tsx` and `meal/[name].tsx`.
+- **`meal/[name].tsx`** — switched to `useAppState((state) => state.allergies)`, fixing the dead allergy warning; now calls `getAllMeals()` instead of its own duplicate AsyncStorage-merge logic. Removed its now-unused `AsyncStorage`/`ALLERGIES_STORAGE_KEY`/`CUSTOM_MEALS_STORAGE_KEY`/`mealsData` imports.
+- **`planner.tsx`** — now imports `bundledMeals`/`getAllMeals` from the shared util instead of defining its own copy.
+- **`constants/storage.ts`** — removed the three dead exports; only `CUSTOM_MEALS_STORAGE_KEY` and `LAST_ADDED_MEAL_STORAGE_KEY` remain (both still genuinely used, deliberately kept off the zustand store per Entry 60's original decision).
+- **`package.json`** — removed the broken `reset-project` script.
+- Condensed the flagged comments in `meal-image-field.native.tsx` (two comments that just restated the next line, one over-long cleanup explanation), `history-data.ts` (two redundant/typo'd comments merged into one), and `health.ios.ts` (three comments that just repeated the code next to them).
+- **Deliberately left the npm-dependency removals alone.** Checked `app.json`'s `plugins` list first — `expo-splash-screen` genuinely is used there (not dead, despite no direct import). The remaining flagged packages aren't in that list either, but several Expo packages (e.g. `expo-status-bar`, `expo-system-ui`) are known to auto-register native behavior with zero required JS import — "not imported" doesn't reliably mean "safe to remove" for those, and verifying would need a native rebuild to actually test. Flagged as a separate, more careful pass rather than bundling it into this cleanup.
+
+### How I verified it
+
+- `tsc --noEmit` — clean after every step (not just at the end), same pre-existing unrelated `example/` errors as prior entries.
+- `npx expo export --platform web` — built successfully; re-confirmed the HealthKit code still stays out of the web bundle (grepped for `kingstinct`/`HKQuantityTypeIdentifier` in the export output — 0 matches).
+- Ran `npx prettier --write` across every touched file; `tsc --noEmit` stayed clean after.
+
+## Entry 63 — Split allergens.ts: data stays in constants/, functions moved to utils/
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "what differes the constants and utills directory, there seem to be utility functions for the allergens for example inside of the constants folder" → "yes and make sure to fix the imports aswell"
+
+### What I built
+
+- **`src/utils/allergens.ts`** (new) — `getAllergenLabel` and `findMatchingAllergens`, moved out of `constants/allergens.ts`. Both are pure functions with no state, matching the pattern every other file in `utils/` (`date.ts`, `calorie-tips.ts`, `meals.ts`, etc.) already follows — `constants/` elsewhere in this codebase is strictly static data/config (`theme.ts`'s `COLORS`, `storage.ts`'s key names, `meal-images.ts`'s lookup map), so bundling logic in with a constant there was an inconsistency, not a deliberate exception.
+- **`constants/allergens.ts`** — now holds only `COMMON_ALLERGENS`, the actual constant.
+- Updated all three import sites: `planner.tsx` and `meal/[name].tsx` (both only used the two functions, straight path swap) and `profile.tsx` (used both — now imports `COMMON_ALLERGENS` from `constants/allergens` and `getAllergenLabel` from `utils/allergens` separately).
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` across every touched file; `tsc --noEmit` stayed clean after.
+
+## Entry 64 — Second comment-condensing pass across the rest of the codebase
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "I would again ask you to go through the code and do some clean up. Check for large comment blocks. We don't need or want those, just summerise." (following on from Entry 62's first pass, which only covered three files)
+
+### What I built
+
+Delegated a read-only scan of every remaining file to a subagent, then applied its findings — removing/condensing comments that just restated the adjacent code, while leaving genuine non-obvious "why" comments untouched even where multi-line (per this project's stated commenting philosophy). Also fixed two small typos in user-facing text noticed along the way ("dvice" → "device", a missing space in "Access requested,tap").
+
+Touched: `utils/date.ts`, `utils/calorie-tips.ts`, `utils/resolve-meal-image.ts`, `hooks/use-appState.ts`, `(tabs)/history.tsx`, `(tabs)/index.tsx`, `(tabs)/planner.tsx`, `add-meal.tsx`, `profile.tsx`, `components/health-connection-status.ios.tsx`, `components/meal-image-field.native.tsx` — roughly 20 individual comments removed or shortened, each one restating a line already self-evident from the code right next to it (e.g. `//add 1 to month because js indexes months from 0` next to `getMonth() + 1`, `//round up to nearest 50` next to `Math.ceil(x/50)*50`).
+
+Left alone (confirmed by the subagent as genuine WHY, not flagged): `utils/meals.ts`, `utils/allergens.ts`, `utils/health.ts`, both `types/*.ts`, `constants/storage.ts`/`allergens.ts`/`meal-images.ts`/`theme.ts`, both `_layout.tsx` files, `meal/[name].tsx` (no comments), `health-connection-status.tsx`, `meal-image-field.tsx`, both `app-tabs.*.tsx` files.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Ran `npx prettier --write` across every touched file; `tsc --noEmit` stayed clean after.
+
+## Entry 65 — Link is no longer a required field when adding a custom meal
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "one more thing is let's remove the link from the required list when creating a meal."
+
+### What I built
+
+- **`add-meal.tsx`** — added `"link"` to `RequiredMealField`'s exclusions (alongside the existing `"allergens"`/`"image"`), and removed `link` from `requiredFieldValues`, so the form's "Add" button no longer stays disabled when the link field is empty. Relabeled it "Link (optional)" so it's clear at a glance. `Meal.link` itself stays typed as a plain (non-optional) `string` — an empty string was already the correct representation of "no link," since `meal/[name].tsx`'s "Open recipe" button already only renders `meal.link !== ""`, and `handleSubmit` already saved `link.trim()` regardless — nothing downstream needed to change.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully with no errors across all routes.
+- Confirmed `meal/[name].tsx`'s recipe-link button was already correctly guarded against an empty link before this change, so no other file needed touching.
+
+## Entry 66 — Replaced the stock README with a real project one
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "I wan you to create a README.md that explains the concept of the application, the different libraries used (actually check if we still use those libraries still). A link to our setup Markdown. The way we handle storage in the application and the split between the Zustand and assyncStorage and why it is there. Then you go over the seperate pages and what they do."
+
+### What I built
+
+- **`README.md`** — fully replaced the unedited `create-expo-app` boilerplate (still referencing the removed `npm run reset-project` script and plain `expo start`) with a real project README:
+  - What the app actually does (goal + calorie margin vs. Apple Health burn, per-day comparison, History chart).
+  - A link to `PHYSICAL_DEVICE_SETUP.md` for the dev-client build process, rather than duplicating it.
+  - The `useAppState`/AsyncStorage split and *why* it exists — same reasoning as Entry 60 (four live, cross-screen fields in zustand+persist; `customMeals`/`lastAddedMealName` deliberately left on plain AsyncStorage since they're read in far fewer places and don't need reactive sync).
+  - A libraries section — cross-checked each entry against actual `src/` imports (`grep -rl "from \"<pkg>\""`) rather than just listing everything in `package.json`; left out packages with zero direct imports (peer deps of libraries above, or config-plugin-only entries like `expo-splash-screen`), with a note explaining why they're omitted despite being installed.
+  - A per-screen rundown (Home, Planner, History, Profile, Add Meal, meal detail modal) covering what each one actually does.
+
+### How I verified it
+
+- Grepped every dependency in `package.json` against `src/` import statements before writing the libraries section, rather than assuming from memory.
+- Confirmed the `PHYSICAL_DEVICE_SETUP.md` link target actually exists in the repo.
+
+## Entry 67 — Fixed a crash on first launch: querying HealthKit before permission was ever requested
+
+**Date:** 2026-09-26
+
+**Prompt given:**
+> "I got the app to launch. When opening it loads for a second and then i got hit with unCaught in promis, id:1 erroor. Domain = com.apple.healthkit code=5 authorisation not determined. UserInfo NSLocalizedDescription=authorization not determined." (on a fresh install on a new phone, via `PHYSICAL_DEVICE_SETUP.md`)
+
+### What I built
+
+- **`utils/health.ios.ts`** — `getBurnedCaloriesForDate` calls `queryStatisticsForQuantity` as soon as Home mounts (via its `useFocusEffect`), regardless of whether Health access has ever been requested. On a genuinely fresh install — nothing has ever tapped "Connect" on Profile's Apple Health row yet — HealthKit doesn't return an empty result for that, it *throws* a native error (`HKError` code 5, `authorization not determined`), which wasn't wrapped in a try/catch anywhere, so it surfaced as an unhandled promise rejection instead of failing gracefully. Wrapped the query in `try`/`catch`, returning `null` — the same "no data" value this function already returns for other reasons (zero HealthKit samples that day) — so an unauthorized/not-yet-asked state is just one more case of "no data" to every caller, rather than a crash.
+
+### How I verified it
+
+- `tsc --noEmit` — clean (same pre-existing unrelated `example/` errors as prior entries).
+- `npx expo export --platform web` — built successfully; re-confirmed the HealthKit code stays out of the web bundle.

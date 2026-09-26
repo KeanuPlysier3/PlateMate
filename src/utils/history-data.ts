@@ -2,10 +2,8 @@ import type { WeightGoal } from "@/utils/calorie-tips";
 
 export type DayStatus = "within" | "tooHigh" | "tooLow" | "noData";
 
-//A buffer of kcal/day within which a day's netBalance is considered "within" the target for the weight goal.
+// Buffer (kcal/day) within which netBalance still counts as "within" the target.
 const STATUS_TOLERANCE = 200;
-
-
 
 export function getDayStatus(
   weightGoal: WeightGoal,
@@ -16,9 +14,14 @@ export function getDayStatus(
     return "noData";
   }
 
+  // target sign flips with weightGoal; deviation = how far off netBalance is from it
   const target =
-    weightGoal === "lose" ? -calorieMargin : weightGoal === "gain" ? calorieMargin : 0; //set the target based on the weight goal: negative for losing, positive for gaining, zero for maintaining
-  const deviation = netBalance - target; //how far of the you are from yr target. 
+    weightGoal === "lose"
+      ? -calorieMargin
+      : weightGoal === "gain"
+        ? calorieMargin
+        : 0;
+  const deviation = netBalance - target;
 
   if (Math.abs(deviation) <= STATUS_TOLERANCE) {
     return "within";

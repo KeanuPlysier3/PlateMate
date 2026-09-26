@@ -15,7 +15,7 @@ const READ_TYPES = [
 ] as const;
 
 export default function HealthConnectionStatus() {
-  const [status, requestAuthorization] = useHealthkitAuthorization({ //destructure the return value of useHealthkitAuthorization to get status and requestAuthorization
+  const [status, requestAuthorization] = useHealthkitAuthorization({
     toRead: READ_TYPES,
   });
 
@@ -31,7 +31,7 @@ export default function HealthConnectionStatus() {
 
   // Apple's HealthKit deliberately never reveals whether a *read* permission
   // has been granted or denied, so we can't show a "connected" state.
-  const hasBeenRequested = status === AuthorizationRequestStatus.unnecessary;//if the status is unnecessary, the user already requested,so we can consider it as "has been requested"
+  const hasBeenRequested = status === AuthorizationRequestStatus.unnecessary;
 
   const handlePress = async () => {
     if (isRequesting) {
@@ -48,18 +48,14 @@ export default function HealthConnectionStatus() {
 
     setIsRequesting(true);
     try {
-      await requestAuthorization();//request access to the specified health data types.
+      await requestAuthorization();
     } finally {
       setIsRequesting(false);
     }
   };
 
   return (
-    <Pressable
-      style={styles.row}
-      onPress={handlePress}
-      disabled={isRequesting}
-    >
+    <Pressable style={styles.row} onPress={handlePress} disabled={isRequesting}>
       <SymbolView
         name={{ ios: "heart.fill", android: "favorite", web: "favorite" }}
         size={22}

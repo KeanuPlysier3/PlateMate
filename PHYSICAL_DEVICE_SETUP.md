@@ -17,7 +17,7 @@ The fix is to stop using Expo Go and instead build our **own native app binary**
 
 ## What changed in the project
 
-- **`app.json`** — added an explicit `ios.bundleIdentifier` (`com.keanuplysier.platemate`). A real, installable iOS app must have a unique bundle identifier; Expo Go didn't need one because it wasn't building a real app for us.
+- **`app.json`** — added an explicit `ios.bundleIdentifier` (`com.Name.platemate`). A real, installable iOS app must have a unique bundle identifier; Expo Go didn't need one because it wasn't building a real app for us.
 - **`app.json`** — configured the HealthKit config plugin explicitly:
   ```json
   ["@kingstinct/react-native-healthkit", {
@@ -39,31 +39,40 @@ You only need to do this once per computer (not per build):
 3. **An Apple ID** signed into Xcode (Xcode → Settings → Accounts). Even a free personal Apple ID works for development — Apple requires every app installed on a real device (not a simulator) to be cryptographically signed by a certificate tied to some Apple developer account, otherwise iOS refuses to run it (this is Apple's anti-malware protection for the platform).
 4. **The project path must not contain spaces.** CocoaPods and some Xcode build scripts pass file paths into shell commands and native build tools unescaped; a space in the path breaks path resolution in ways that are hard to diagnose (we hit this directly — the project had to be moved from a path containing "creative development" to one without spaces before the build would succeed).
 
-## Building and running on your iPhone
+## Building and running on your iPhone (first time on a new device)
 
-1. **Connect your iPhone to your Mac** via USB cable (first time), and trust the computer on the phone if asked.
-2. **Enable Developer Mode on the iPhone**: `Settings → Privacy & Security → Developer Mode` → turn it on → the phone restarts → confirm "Turn On" in the popup after unlocking. Required on iOS 16+ before the phone will run any app built with a personal development-signed binary.
-3. Install JS dependencies and CocoaPods dependencies if you haven't already:
+This is the full, in-order flow the first time you set up a specific iPhone. Every step here only needs doing once per device — see "Day-to-day after the first build" below for what it looks like afterward.
+
+1. **Connect your iPhone to your Mac** via USB cable, unlock it, and tap **Trust This Computer** if prompted.
+2. **Register the device with Xcode**: open Xcode → **Window → Devices and Simulators** (⌘⇧2) and select the iPhone in the left-hand list. This is also what makes step 3 possible — Apple hides the Developer Mode toggle entirely on a phone Xcode has never seen before.
+3. **Enable Developer Mode on the iPhone**: `Settings → Privacy & Security → Developer Mode` (now visible, at the very bottom) → turn it on → the phone restarts → confirm "Turn On" in the popup after unlocking.
+4. **Install dependencies**:
    ```bash
    npm install
    cd ios && pod install && cd ..
    ```
-4. Run:
+5. **Open `ios/PlateMate.xcworkspace` in Xcode** (do this the first time on a new device, rather than starting with the CLI). In the toolbar's destination dropdown, select your iPhone by name from the "iOS Devices" section — it defaults to a simulator, so this needs to be picked explicitly.
+6. **Let Xcode finish preparing the device.** If it's the first time Xcode has built for this exact iOS version, it shows "Preparing device for development" and downloads the matching device-support files — the ▶ Run button won't work until this finishes. Check progress any time via ⌘⇧2.
+7. **Press ▶ Run.** This builds, code-signs, and installs the app — and also silently registers the device's UDID against your provisioning profile, which is exactly what's missing the first time you instead try the CLI directly (see the `Provisioning profile ... doesn't include the currently selected device` error below).
+8. **Trust the developer certificate on the phone.** The app is now installed but won't open yet — go to **Settings → General → VPN & Device Management**, tap the certificate under "Developer App" (`Apple Development: your-apple-id@email.com`), then **Trust**, and confirm. iOS refuses to run a personally-signed app until this is done, once per developer certificate.
+9. **Start Metro and open the app.** Building via Xcode doesn't start the JS bundler automatically the way the CLI does, so run this separately (use `npm start` rather than the raw command below — it also prints the manual server URL you may need in a moment):
    ```bash
-   npx expo run:ios --device
+   npm start
    ```
-   This will:
-   - Generate/refresh the native `ios/` project from `app.json` (prebuild).
-   - Compile the app with Xcode's build tools.
-   - Code-sign it with your Apple ID's development certificate.
-   - Install it on the connected iPhone.
-   - Start the Metro bundler (the JS bundler/dev server) and connect the installed app to it over your local network/USB, the same role Expo Go's bundler connection played before.
+   Then open PlateMate on the phone. It normally finds the Metro server automatically. If it instead shows a "Searching for development servers" screen, or "No script URL provided" after opening:
+   - Tap **Enter URL manually** on that screen.
+   - Copy the URL `npm start` printed at the top of its output (`Dev client manual URL: http://<your-mac's-ip>:8081`) and paste it in.
+   - If your phone and Mac can't reach each other directly at all (common on school/work Wi-Fi with client isolation), use `npm run start:tunnel` instead, and paste the `https://....exp.direct` URL it prints instead.
 
-   Alternatively, you can open `ios/PlateMate.xcworkspace` in Xcode directly, pick your iPhone as the run destination in the toolbar, and press the ▶ Run button. Do this if the CLI reports a signing error — Xcode's own UI is what actually registers a new device's UDID against your provisioning profile the first time you build to it; the CLI does not always trigger that registration. If you build via Xcode directly (not `expo run:ios`), Metro won't be started automatically — start it yourself with `npx expo start --dev-client`, then reload the app on the phone (shake the device → Reload, or force-close and reopen it).
+### Day-to-day after the first build on a device
 
-   Two things to watch for the first time you do this in Xcode's UI:
-   - **The run destination defaults to a simulator** (e.g. "iPhone 17" simulator), not your physical phone. Click the destination dropdown in the toolbar (next to the scheme name) and explicitly select your connected iPhone by name from the "iOS Devices" section — otherwise Xcode happily builds and boots a simulator instead of installing anything to your actual phone.
-   - **Xcode has to download debugging support for your phone's exact iOS version before it will install anything.** The first time you select a real device that Xcode hasn't seen before (or that's on a newer iOS version than Xcode currently has support files for), it shows a "Preparing device for development" step and downloads the matching iOS device-support/symbols package. The Run button is effectively disabled/will fail until that download finishes — just wait for it to complete once, and subsequent builds to that device skip this step. You can check the download's progress with **⌘⇧2** (Window → Devices and Simulators).
+Once a device has been through the flow above once, you don't need Xcode again for it unless the app is uninstalled, the code signature expires (see below), or you add a new native dependency. Normal work is just:
+
+```bash
+npx expo run:ios --device
+```
+
+or, if the app's already installed and you just want to develop/reload JS, `npm start` and open the app directly.
 
 ## Living with a free personal Apple ID
 
@@ -71,6 +80,12 @@ Using a free Apple ID (no paid Apple Developer Program membership, $99/year) ins
 
 - **The app's code signature expires after 7 days.** After that, iOS refuses to launch it (it just fails to open) until you rebuild and reinstall from your Mac — run `npx expo run:ios --device` again, or Run from Xcode again. This isn't a bug; it's Apple's limit on free-tier development signing.
 - **It only runs on devices whose UDID is registered in the provisioning profile** — currently just your iPhone. It can't be shared by installing the `.app`/`.ipa` on someone else's phone; they'd need to build it themselves from source on their own Mac with their own Apple ID.
+
+## Testing the "burned calories" feature without background tracking
+
+PlateMate reads Active + Resting Energy from Apple Health. If your iPhone hasn't actually been tracking activity in the background (a simulator, a phone that's been sitting still, or one that just isn't wearing an Apple Watch), Home's "Live burn" stat and the History chart will have nothing real to show.
+
+You can add a manual entry yourself to test against real numbers: open the **Health** app → **Browse** → **Activity** → **Active Energy** → tap the **+** in the top-right corner → enter an amount and time → **Add**. PlateMate will pick it up the next time it queries HealthKit (reload the app, or switch tabs and back).
 
 ## Common errors and what they mean
 
@@ -83,7 +98,7 @@ Using a free Apple ID (no paid Apple Developer Program membership, $99/year) ins
   ```bash
   cd ios && rm -rf Pods build Podfile.lock ~/Library/Developer/Xcode/DerivedData/PlateMate-* && pod install
   ```
-- **`ApplicationVerificationFailed` while installing to the device** — iOS refused to trust the app's signature on that specific device. Usually means either Developer Mode isn't enabled yet (see step 2 above), or the device's UDID isn't yet registered in your provisioning profile — building once from the Xcode UI (not the CLI) resolves the latter, since Xcode auto-registers a newly connected device.
+- **`ApplicationVerificationFailed` while installing to the device**, or **`Provisioning profile "iOS Team Provisioning Profile: com.name.platemate" doesn't include the currently selected device "..." (identifier ...)`** (`xcodebuild exited with error code 65`) — both mean the device hasn't been through the first-time flow above yet: either Developer Mode isn't enabled, or its UDID isn't registered in the provisioning profile. Building once from the Xcode UI (step 5–7 above), not the CLI, resolves it — the CLI alone can't trigger that registration on a brand-new device.
 - **`No script URL provided` on launch** — The installed app is fine, but it can't find the Metro bundler serving the JS bundle. Make sure `npx expo start --dev-client` (or the bundler started automatically by `expo run:ios`) is actually running, then reload the app.
 
 ## Why this doesn't affect the web or Android-without-HealthKit builds

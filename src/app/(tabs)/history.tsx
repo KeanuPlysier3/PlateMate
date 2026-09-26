@@ -1,20 +1,13 @@
 import { useCallback, useState } from "react";
 import { ScrollView, Text, View, StyleSheet } from "react-native";
 import { useFocusEffect } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BarChart } from "react-native-gifted-charts";
 
-import {
-  CALORIE_MARGIN_STORAGE_KEY,
-  PLANNED_MEALS_STORAGE_KEY,
-  WEIGHT_GOAL_STORAGE_KEY,
-} from "@/constants/storage";
 import { COLORS } from "@/constants/theme";
-import type { WeightGoal } from "@/utils/calorie-tips";
+import { useAppState } from "@/hooks/use-appState";
 import { getStartOfToday, toDateKey } from "@/utils/date";
 import { getBurnedCaloriesForDate } from "@/utils/health";
 import { getDayStatus, type DayStatus } from "@/utils/history-data";
-import type { PlannedMeals } from "@/types/planned-meal";
 
 const HISTORY_DAYS_COUNT = 7; // the 6 days before today + today
 
@@ -51,6 +44,9 @@ const STATUS_LABELS: Record<DayStatus, string> = {
 };
 
 export default function History() {
+  const plannedMeals = useAppState((state) => state.plannedMeals);
+  const weightGoal = useAppState((state) => state.weightGoal);
+  const calorieMargin = useAppState((state) => state.calorieMargin);
   const [historyDays, setHistoryDays] = useState<HistoryDay[]>([]);
 
   useFocusEffect(
@@ -58,17 +54,6 @@ export default function History() {
       let isActive = true;
 
       (async () => {
-        const [storedPlannedMeals, storedGoal, storedMargin] = await Promise.all([
-          AsyncStorage.getItem(PLANNED_MEALS_STORAGE_KEY),
-          AsyncStorage.getItem(WEIGHT_GOAL_STORAGE_KEY),
-          AsyncStorage.getItem(CALORIE_MARGIN_STORAGE_KEY),
-        ]);
-        const plannedMeals: PlannedMeals = storedPlannedMeals
-          ? JSON.parse(storedPlannedMeals)
-          : {};
-        const weightGoal: WeightGoal = (storedGoal as WeightGoal) ?? "maintain"; //trust that the stored value is a valid WeightGoal, default to "maintain" if not found.
-        const calorieMargin = storedMargin ? Number(storedMargin) : 0;//store the calorie margin as a number, default to 0 if not found.
-
         const dates = getHistoryDates();
         const burnedCaloriesByDate = await Promise.all(
           dates.map((date) => getBurnedCaloriesForDate(date)),
@@ -95,7 +80,7 @@ export default function History() {
       return () => {
         isActive = false;
       };
-    }, []),
+    }, [plannedMeals, weightGoal, calorieMargin]),
   );
 
   const barData = historyDays.map((day) => ({
@@ -104,8 +89,19 @@ export default function History() {
     label: day.date.toLocaleDateString(undefined, { weekday: "short" }),
   }));
 
+  const maxAbsBalance = Math.max(
+    100,
+    ...historyDays.map((day) =>
+      day.netBalance !== null ? Math.abs(day.netBalance) : 0,
+    ),
+  );
+  const chartMax = Math.ceil(maxAbsBalance / 50) * 50;
+
   return (
-    <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.container}
+    >
       <Text style={styles.title}>History</Text>
       <Text style={styles.chartLabel}>Net balance per day (kcal)</Text>
 
@@ -116,9 +112,11 @@ export default function History() {
           barWidth={28}
           spacing={10}
           initialSpacing={10}
-      
+
           noOfSections={4}
           noOfSectionsBelowXAxis={4}
+          maxValue={chartMax}
+          mostNegativeValue={-chartMax}
           xAxisThickness={1}
           xAxisColor={COLORS.textMuted}
           yAxisThickness={1}
@@ -148,9 +146,14 @@ export default function History() {
 
           <View style={styles.dayRowStatus}>
             <View
-              style={[styles.statusDot, { backgroundColor: STATUS_COLORS[day.status] }]}
+              style={[
+                styles.statusDot,
+                { backgroundColor: STATUS_COLORS[day.status] },
+              ]}
             />
-            <Text style={styles.dayRowStatusText}>{STATUS_LABELS[day.status]}</Text>
+            <Text style={styles.dayRowStatusText}>
+              {STATUS_LABELS[day.status]}
+            </Text>
           </View>
         </View>
       ))}
